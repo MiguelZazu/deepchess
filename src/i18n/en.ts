@@ -277,6 +277,8 @@ export const EN: Record<string, string> = {
   'Sonidos electrónicos': 'Electronic sounds',
   'Sonidos «{name}»': 'Sounds "{name}"',
   'Por defecto': 'Default',
+  'Viendo una jugada anterior': 'Viewing an earlier move',
+  'Pulsa → para volver a la posición actual.': 'Press → to go back to the current position.',
   'Opciones del motor': 'Engine options',
   'Clásico': 'Classic',
   'Grabación de piezas sobre tablero (por defecto)': 'Recording of pieces on a board (default)',

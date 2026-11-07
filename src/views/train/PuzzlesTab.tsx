@@ -70,6 +70,21 @@ export function PuzzlesTab() {
     },
   });
 
+  // Web: ← / → step back and forth through the moves of the puzzle.
+  const { back, forward } = game;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return;
+      if (e.key === 'ArrowLeft') back();
+      else if (e.key === 'ArrowRight') forward();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [back, forward]);
+
   const done = game.status === 'solved' || game.status === 'shown';
   const side = game.solverColor === 'white' ? t('BLANCAS') : t('NEGRAS');
   const accuracy = stats.games ? Math.round((stats.solved / stats.games) * 100) : 0;
@@ -102,6 +117,9 @@ export function PuzzlesTab() {
     headline = t('No es esa ✗');
     sub = t('Inténtalo otra vez.');
     tone = 'bad';
+  } else if (game.viewing) {
+    headline = t('Viendo una jugada anterior');
+    sub = t('Pulsa → para volver a la posición actual.');
   } else {
     headline = t('Te toca con {side}', { side });
     sub = game.hintMove
