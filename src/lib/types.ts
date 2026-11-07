@@ -172,6 +172,16 @@ export interface Appearance {
   assets: Partial<Record<AssetSlot, number>>; // uploaded image versions (timestamps)
 }
 
+export type SoundPack = 'wood' | 'soft' | 'classic' | 'retro' | 'custom';
+export type CustomSoundSlot = 'move' | 'capture';
+export interface SoundSettings {
+  enabled: boolean;
+  volume: number; // 0..1
+  pack: SoundPack;
+  /** Uploaded sounds (value = upload time, used to reload them). */
+  custom: Partial<Record<CustomSoundSlot, number>>;
+}
+
 export interface Settings {
   language: 'es' | 'en';
   engine: 'sf19-lite' | 'sf19';
@@ -186,4 +196,5 @@ export interface Settings {
   showBestArrow: boolean;
   showLiveArrow: boolean;
   appearance: Appearance;
+  sound: SoundSettings;
 }

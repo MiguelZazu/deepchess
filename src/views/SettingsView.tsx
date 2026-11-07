@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ImagePlus, Languages, RotateCcw, Trash2 } from 'lucide-react';
+import { ImagePlus, Languages, Play, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { LANGS, t } from '../i18n';
 import { clearReviews, DEFAULT_SETTINGS } from '../lib/storage';
 import { deleteAsset, getAsset, saveAsset } from '../lib/assets';
@@ -14,18 +14,20 @@ import {
   PIECE_SETS,
   pieceUrl,
 } from '../lib/appearance';
+import { customSoundNames, deleteCustomSound, playDemo, playSound, saveCustomSound, SOUND_PACKS } from '../lib/sound';
 import { ENGINES, canUseThreads, maxThreads, type EngineId } from '../engine/stockfish';
 import { TIME_OPTIONS } from '../components/EngineLines';
 import { Board } from '../components/Board';
 import { ClassIcon, CLASS_META } from '../components/ClassIcon';
-import type { Appearance, AssetSlot, Classification, PieceCode, Settings } from '../lib/types';
+import type { Appearance, AssetSlot, Classification, CustomSoundSlot, PieceCode, Settings, SoundSettings } from '../lib/types';
 
-type Tab = 'engine' | 'app' | 'board' | 'pieces' | 'data';
+type Tab = 'engine' | 'app' | 'board' | 'pieces' | 'sound' | 'data';
 const TABS: [Tab, string][] = [
   ['engine', 'Motor'],
   ['app', 'Apariencia'],
   ['board', 'Tablero'],
   ['pieces', 'Piezas'],
+  ['sound', 'Sonido'],
   ['data', 'Datos'],
 ];
 const PREVIEW_FEN = 'r1bqk2r/pppp1ppp/2n2n2/2b1p1N1/2B1P3/8/PPPP1PPP/RNBQK2R b KQkq - 5 4';
@@ -442,6 +444,7 @@ export function SettingsView({ settings, onChange }: Props) {
             </>
           )}
 
+          {tab === 'sound' && <SoundTab sound={settings.sound} onChange={(s) => set('sound', s)} />}
           {tab === 'data' && <DataTab settings={settings} onChange={onChange} />}
         </div>
 
@@ -829,6 +832,157 @@ function Segmented<T extends string>({ value, options, onChange }: { value: T; o
         </button>
       ))}
     </div>
+  );
+}
+
+function SoundTab({ sound, onChange }: { sound: SoundSettings; onChange: (s: SoundSettings) => void }) {
+  const setS = (p: Partial<SoundSettings>) => onChange({ ...sound, ...p });
+  const [error, setError] = useState<string | null>(null);
+  const [names, setNames] = useState<Partial<Record<CustomSoundSlot, string>>>({});
+  const customKey = JSON.stringify(sound.custom);
+  useEffect(() => {
+    customSoundNames().then(setNames);
+  }, [customKey]);
+
+  const upload = async (slot: CustomSoundSlot, file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    try {
+      await saveCustomSound(slot, file);
+      setS({ pack: 'custom', enabled: true, custom: { ...sound.custom, [slot]: Date.now() } });
+      playSound(slot, { preview: true, pack: 'custom' });
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  const remove = async (slot: CustomSoundSlot) => {
+    await deleteCustomSound(slot);
+    const custom = { ...sound.custom };
+    delete custom[slot];
+    setS({ custom, pack: slot === 'move' && sound.pack === 'custom' ? 'wood' : sound.pack });
+  };
+
+  return (
+    <>
+      <section className="card">
+        <h3 className="card-title">{t('Sonido')}</h3>
+        <Row label="Sonidos de movimiento" hint="Al mover, capturar, enrocar, coronar y dar jaque.">
+          <Toggle checked={sound.enabled} onChange={(v) => setS({ enabled: v })} />
+        </Row>
+        <Row label="Volumen">
+          <input
+            type="range"
+            className="volume-range"
+            min={0}
+            max={100}
+            step={5}
+            value={Math.round(sound.volume * 100)}
+            disabled={!sound.enabled}
+            onChange={(e) => setS({ volume: Number(e.target.value) / 100 })}
+            onPointerUp={() => playSound('move', { preview: true })}
+            aria-label={t('Volumen')}
+          />
+        </Row>
+      </section>
+
+      <section className="card">
+        <h3 className="card-title">{t('Tipo de sonido')}</h3>
+        <div className="sound-grid">
+          {SOUND_PACKS.map((p) => (
+            <button
+              key={p.id}
+              className={`sound-pack ${sound.pack === p.id ? 'active' : ''}`}
+              onClick={() => {
+                setS({ pack: p.id });
+                playDemo(p.id);
+              }}
+            >
+              <span className="sp-name">
+                {p.label} <Play size={13} />
+              </span>
+              <span className="fine-print">{p.hint}</span>
+            </button>
+          ))}
+          <button
+            className={`sound-pack ${sound.pack === 'custom' ? 'active' : ''}`}
+            onClick={() => {
+              setS({ pack: 'custom' });
+              if (sound.custom.move) playDemo('custom');
+            }}
+          >
+            <span className="sp-name">
+              {t('Personalizado')} <Upload size={13} />
+            </span>
+            <span className="fine-print">{t('Tus propios archivos de audio')}</span>
+          </button>
+        </div>
+      </section>
+
+      <section className="card">
+        <h3 className="card-title">{t('Sonidos propios')}</h3>
+        <p className="fine-print">{t('MP3, WAV u OGG de hasta 1 MB y 3 segundos. Se guardan solo en este dispositivo.')}</p>
+        {error && <div className="form-error">{error}</div>}
+        <SoundUpload
+          label="Movimiento"
+          hint="También se usa para enroque, coronación y jaque."
+          name={sound.custom.move ? names.move : undefined}
+          onFile={(f) => upload('move', f)}
+          onPlay={() => playSound('move', { preview: true, pack: 'custom' })}
+          onRemove={() => remove('move')}
+        />
+        <SoundUpload
+          label="Captura (opcional)"
+          hint="Si no subes uno, se usa el de movimiento."
+          name={sound.custom.capture ? names.capture : undefined}
+          onFile={(f) => upload('capture', f)}
+          onPlay={() => playSound('capture', { preview: true, pack: 'custom' })}
+          onRemove={() => remove('capture')}
+        />
+      </section>
+    </>
+  );
+}
+
+function SoundUpload(p: {
+  label: string;
+  hint: string;
+  name?: string;
+  onFile: (f: File | undefined) => void;
+  onPlay: () => void;
+  onRemove: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <Row label={p.label} hint={p.hint}>
+      <div className="sound-upload">
+        <span className="sound-file" title={p.name}>
+          {p.name ?? t('Ninguno')}
+        </span>
+        <button className="btn small ghost" onClick={() => input.current?.click()}>
+          <Upload size={14} />{' '}{t('Subir')}
+        </button>
+        {p.name && (
+          <>
+            <button className="icon-btn small" onClick={p.onPlay} aria-label={t('Escuchar')} title={t('Escuchar')}>
+              <Play size={14} />
+            </button>
+            <button className="icon-btn danger small" onClick={p.onRemove} aria-label={t('Quitar')} title={t('Quitar')}>
+              <Trash2 size={14} />
+            </button>
+          </>
+        )}
+        <input
+          ref={input}
+          type="file"
+          accept="audio/*,.mp3,.wav,.ogg,.m4a"
+          hidden
+          onChange={(e) => {
+            p.onFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
+      </div>
+    </Row>
   );
 }
 

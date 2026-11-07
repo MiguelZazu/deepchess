@@ -12,6 +12,7 @@ import { LookProvider } from './lib/look';
 import { setLang } from './i18n';
 import type { Account, GameSummary, Platform, Settings } from './lib/types';
 import { t } from './i18n';
+import { configureSound } from './lib/sound';
 
 type Route =
   | { name: 'home' }
@@ -62,6 +63,8 @@ export default function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+
+  useEffect(() => configureSound(settings.sound), [settings.sound]);
 
   // (Re)create the engines whenever the engine selection changes; also warms them up.
   useEffect(() => {

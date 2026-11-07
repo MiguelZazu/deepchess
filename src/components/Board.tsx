@@ -5,6 +5,7 @@ import type { Classification } from '../lib/types';
 import { useLook } from '../lib/look';
 import { hexA, PIECE_CODES } from '../lib/appearance';
 import { CLASS_META, ClassIcon } from './ClassIcon';
+import { moveSound, playSound } from '../lib/sound';
 
 export interface BoardArrow {
   from: string;
@@ -51,6 +52,16 @@ export function Board({ fen, orientation, lastMove, badge, arrows = [], onMove, 
     const isPromo = piece.type === 'p' && (q.to[1] === '8' || q.to[1] === '1');
     onMoveRef.current(q.from, q.to, isPromo ? 'q' : undefined);
   }, [fen, turn, me, queued, onMove]);
+
+  // Sound whenever the position changes through a move (played, replied or stepped through).
+  const prevFen = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevFen.current;
+    prevFen.current = fen;
+    if (prev === null || prev === fen || !lastMove) return;
+    playSound(moveSound(prev, fen, lastMove));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fen]);
 
   // Forget a queued move when the board is reused for another game or the feature is turned off.
   useEffect(() => setQueued(null), [id, orientation, premove, look.premove]);

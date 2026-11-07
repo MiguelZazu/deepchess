@@ -2,6 +2,7 @@ import { get, set, clear, createStore } from 'idb-keyval';
 import type { Account, GameReview, GameSummary, Settings } from './types';
 import { REVIEW_VERSION } from '../analysis/review';
 import { DEFAULT_APPEARANCE } from './appearance';
+import { DEFAULT_SOUND } from './sound';
 import { detectLang } from '../i18n';
 
 const reviewStore = createStore('deepchess', 'reviews');
@@ -45,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showBestArrow: true,
   showLiveArrow: true,
   appearance: DEFAULT_APPEARANCE,
+  sound: DEFAULT_SOUND,
 };
 export function loadSettings(): Settings {
   const raw = readLS<Partial<Settings> & { boardTheme?: string }>('dc:settings', {});
@@ -52,7 +54,8 @@ export function loadSettings(): Settings {
   // Migrate the old single "boardTheme" option.
   if (!raw.appearance && raw.boardTheme) appearance.boardPreset = raw.boardTheme === 'ice' ? 'blue' : raw.boardTheme;
   delete raw.boardTheme;
-  return { ...DEFAULT_SETTINGS, ...raw, appearance };
+  const sound = { ...DEFAULT_SOUND, ...(raw.sound ?? {}) };
+  return { ...DEFAULT_SETTINGS, ...raw, appearance, sound };
 }
 export const saveSettings = (s: Settings) => writeLS('dc:settings', s);
 
