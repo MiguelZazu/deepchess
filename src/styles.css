@@ -2888,3 +2888,12 @@ details.more[open] summary svg {
     width: 130px;
   }
 }
+.setting-row .segmented.wide {
+  flex-wrap: nowrap;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.setting-row .segmented.wide button {
+  white-space: nowrap;
+  padding-inline: 12px;
+}

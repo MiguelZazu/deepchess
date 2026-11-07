@@ -159,6 +159,13 @@ export interface Appearance {
   /** Queue a move while the opponent is thinking (training boards). */
   premove: boolean;
   highlight: string;
+  /** Last-move highlight: filled squares, outline or nothing. */
+  lastMoveStyle: 'fill' | 'border' | 'off';
+  lastMoveOpacity: number; // 0..1
+  /** Also tint the origin square (otherwise only the destination). */
+  lastMoveFrom: boolean;
+  /** Use the colour of the move classification (brilliant, blunder…) when there is one. */
+  lastMoveClassColor: boolean;
   bestArrow: string;
   liveArrow: string;
   pieceSet: string;
@@ -172,7 +179,7 @@ export interface Appearance {
   assets: Partial<Record<AssetSlot, number>>; // uploaded image versions (timestamps)
 }
 
-export type SoundPack = 'wood' | 'soft' | 'classic' | 'retro' | 'custom';
+export type SoundPack = 'board' | 'wood' | 'soft' | 'sfx' | 'piano' | 'nes' | 'futuristic' | 'custom';
 export type CustomSoundSlot = 'move' | 'capture';
 export interface SoundSettings {
   enabled: boolean;
@@ -197,4 +204,6 @@ export interface Settings {
   showLiveArrow: boolean;
   appearance: Appearance;
   sound: SoundSettings;
+  /** Version of the defaults the settings were last migrated to. */
+  settingsRev?: number;
 }

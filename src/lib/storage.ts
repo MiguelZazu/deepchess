@@ -2,7 +2,7 @@ import { get, set, clear, createStore } from 'idb-keyval';
 import type { Account, GameReview, GameSummary, Settings } from './types';
 import { REVIEW_VERSION } from '../analysis/review';
 import { DEFAULT_APPEARANCE } from './appearance';
-import { DEFAULT_SOUND } from './sound';
+import { DEFAULT_SOUND, normalizePack } from './sound';
 import { detectLang } from '../i18n';
 
 const reviewStore = createStore('deepchess', 'reviews');
@@ -32,14 +32,16 @@ function writeLS(key: string, value: unknown) {
 }
 
 // ---------- Settings ----------
+/** Bump when defaults change in a way existing users should get too (see loadSettings). */
+const SETTINGS_REV = 2;
 export const DEFAULT_SETTINGS: Settings = {
   language: detectLang(),
   engine: 'sf19-lite',
   threads: Math.max(1, (typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : 2) - 1),
   hashMb: 64,
-  reviewDepth: 14,
+  reviewDepth: 12,
   reviewMaxTime: 0,
-  liveDepth: 22,
+  liveDepth: 20,
   liveLines: 3,
   liveMaxTime: 0,
   liveEngine: true,
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showLiveArrow: true,
   appearance: DEFAULT_APPEARANCE,
   sound: DEFAULT_SOUND,
+  settingsRev: SETTINGS_REV,
 };
 export function loadSettings(): Settings {
   const raw = readLS<Partial<Settings> & { boardTheme?: string }>('dc:settings', {});
@@ -55,7 +58,15 @@ export function loadSettings(): Settings {
   if (!raw.appearance && raw.boardTheme) appearance.boardPreset = raw.boardTheme === 'ice' ? 'blue' : raw.boardTheme;
   delete raw.boardTheme;
   const sound = { ...DEFAULT_SOUND, ...(raw.sound ?? {}) };
-  return { ...DEFAULT_SETTINGS, ...raw, appearance, sound };
+  sound.pack = normalizePack(sound.pack);
+  const out: Settings = { ...DEFAULT_SETTINGS, ...raw, appearance, sound };
+  if ((raw.settingsRev ?? 0) < 2 && Object.keys(raw).length > 0) {
+    // v2: chess.com-like analysis (quick review, live depth 20 with 3 lines) and recorded move sounds.
+    Object.assign(out, { engine: 'sf19-lite', reviewDepth: 12, reviewMaxTime: 0, liveDepth: 20, liveLines: 3, liveMaxTime: 0 });
+    if (sound.pack === 'wood' || sound.pack === 'soft') sound.pack = 'board';
+  }
+  out.settingsRev = SETTINGS_REV;
+  return out;
 }
 export const saveSettings = (s: Settings) => writeLS('dc:settings', s);
 

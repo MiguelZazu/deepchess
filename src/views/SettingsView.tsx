@@ -14,7 +14,7 @@ import {
   PIECE_SETS,
   pieceUrl,
 } from '../lib/appearance';
-import { customSoundNames, deleteCustomSound, playDemo, playSound, saveCustomSound, SOUND_PACKS } from '../lib/sound';
+import { customSoundNames, deleteCustomSound, playDemo, playSound, saveCustomSound, SOUND_CREDITS, SOUND_PACKS } from '../lib/sound';
 import { ENGINES, canUseThreads, maxThreads, type EngineId } from '../engine/stockfish';
 import { TIME_OPTIONS } from '../components/EngineLines';
 import { Board } from '../components/Board';
@@ -311,9 +311,54 @@ export function SettingsView({ settings, onChange }: Props) {
                 >
                   <Toggle checked={a.premove} onChange={(v) => setA({ premove: v })} />
                 </Row>
-                <Row label={t('Resaltado de la última jugada')}>
-                  <input type="color" value={a.highlight} onChange={(e) => setA({ highlight: e.target.value })} />
+              </section>
+
+              <section className="card">
+                <h3 className="card-title">{t('Resaltado de la última jugada')}</h3>
+                <Row label="Estilo" hint="Cómo se marca el último movimiento.">
+                  <Segmented
+                    value={a.lastMoveStyle ?? 'fill'}
+                    options={[
+                      ['fill', 'Relleno'],
+                      ['border', 'Borde'],
+                      ['off', 'Ninguno'],
+                    ]}
+                    onChange={(v) => setA({ lastMoveStyle: v })}
+                  />
                 </Row>
+                {(a.lastMoveStyle ?? 'fill') !== 'off' && (
+                  <>
+                    <Row label="Color">
+                      <ColorRow
+                        value={a.highlight}
+                        presets={['#ffd246', '#f6f669', '#9bc700', '#5ab0ff', '#ff8a3d', '#c77dff', '#ffffff']}
+                        onChange={(c) => setA({ highlight: c })}
+                      />
+                    </Row>
+                    <Row label="Intensidad">
+                      <input
+                        type="range"
+                        className="volume-range"
+                        min={15}
+                        max={85}
+                        step={5}
+                        value={Math.round((a.lastMoveOpacity ?? 0.45) * 100)}
+                        onChange={(e) => setA({ lastMoveOpacity: Number(e.target.value) / 100 })}
+                        aria-label={t('Intensidad')}
+                      />
+                    </Row>
+                    <Row label="Marcar también la casilla de origen">
+                      <Toggle checked={a.lastMoveFrom ?? true} onChange={(v) => setA({ lastMoveFrom: v })} />
+                    </Row>
+                    <Row label="Color según la clasificación" hint="En la revisión, la jugada se tiñe del color de su icono (brillante, error…).">
+                      <Toggle checked={a.lastMoveClassColor ?? true} onChange={(v) => setA({ lastMoveClassColor: v })} />
+                    </Row>
+                  </>
+                )}
+              </section>
+
+              <section className="card">
+                <h3 className="card-title">{t('Flechas')}</h3>
                 <Row label={t('Flecha de la mejor jugada')}>
                   <input type="color" value={a.bestArrow} onChange={(e) => setA({ bestArrow: e.target.value })} />
                 </Row>
@@ -488,15 +533,15 @@ interface EnginePreset {
 }
 const ENGINE_PRESETS: EnginePreset[] = [
   {
-    id: 'fast',
-    get label() { return t('Rápido'); },
-    get desc() { return t('Lite · revisión prof. 12 · vivo prof. 18, 2 líneas. Ideal para móvil.'); },
-    values: { engine: 'sf19-lite', reviewDepth: 12, reviewMaxTime: 0, liveDepth: 18, liveLines: 2, liveMaxTime: 0 },
+    id: 'chesscom',
+    get label() { return t('Como chess.com'); },
+    get desc() { return t('Lite · revisión rápida (prof. 12) · vivo prof. 20, 3 líneas. Rápido también en móvil.'); },
+    values: { engine: 'sf19-lite', reviewDepth: 12, reviewMaxTime: 0, liveDepth: 20, liveLines: 3, liveMaxTime: 0 },
   },
   {
     id: 'balanced',
-    get label() { return t('Equilibrado'); },
-    get desc() { return t('Lite · revisión prof. 14 · vivo prof. 22, 3 líneas.'); },
+    get label() { return t('Preciso'); },
+    get desc() { return t('Lite · revisión prof. 14 · vivo prof. 22, 3 líneas. Algo más lento y exacto.'); },
     values: { engine: 'sf19-lite', reviewDepth: 14, reviewMaxTime: 0, liveDepth: 22, liveLines: 3, liveMaxTime: 0 },
   },
   {
@@ -536,7 +581,7 @@ function EngineTab({
           {ENGINE_PRESETS.map((p) => (
             <button key={p.id} className={`engine-card ${activePreset === p.id ? 'active' : ''}`} onClick={() => applyPreset(p)}>
               <b>{p.label}</b>
-              {p.id === 'balanced' && <span className="tag">{t('por defecto')}</span>}
+              {p.id === 'chesscom' && <span className="tag">{t('por defecto')}</span>}
               <p>{p.desc}</p>
             </button>
           ))}
@@ -690,6 +735,11 @@ function DataTab({ settings, onChange }: Props) {
             <li key={p.id}>
               {t('Piezas «{name}»', { name: p.name })}: {p.author} — {p.license}
               {p.nc ? ` (${t('uso no comercial')})` : ''}
+            </li>
+          ))}
+          {SOUND_CREDITS.map((s) => (
+            <li key={s.name}>
+              {t('Sonidos «{name}»', { name: s.name })}: {s.author} — {s.license}
             </li>
           ))}
         </ul>

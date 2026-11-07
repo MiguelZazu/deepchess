@@ -12,6 +12,7 @@ export interface BoardLook {
   coords: boolean;
   premove: boolean;
   highlight: string;
+  lastMove: { style: Appearance['lastMoveStyle']; opacity: number; from: boolean; classColor: boolean };
   bestArrow: string;
   liveArrow: string;
   pieces: Record<PieceCode, string> | null;
@@ -27,6 +28,7 @@ const fallback: BoardLook = {
   coords: true,
   premove: false,
   highlight: DEFAULT_APPEARANCE.highlight,
+  lastMove: { style: 'fill', opacity: 0.45, from: true, classColor: true },
   bestArrow: DEFAULT_APPEARANCE.bestArrow,
   liveArrow: DEFAULT_APPEARANCE.liveArrow,
   pieces: null,
@@ -86,6 +88,12 @@ export function buildLook(a: Appearance, assets: Partial<Record<AssetSlot, strin
     coords: a.coords,
     premove: !!a.premove,
     highlight: a.highlight,
+    lastMove: {
+      style: a.lastMoveStyle ?? 'fill',
+      opacity: a.lastMoveOpacity ?? 0.45,
+      from: a.lastMoveFrom ?? true,
+      classColor: a.lastMoveClassColor ?? true,
+    },
     bestArrow: a.bestArrow,
     liveArrow: a.liveArrow,
     pieces,

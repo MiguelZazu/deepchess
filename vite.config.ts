@@ -50,7 +50,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,wasm,json}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,wasm,json,mp3}'],
         // The full engine (~95 MB) is cached on first use instead of precached.
         globIgnores: ['engine/stockfish-19.*', 'engine/stockfish-19-single.*'],
         runtimeCaching: [

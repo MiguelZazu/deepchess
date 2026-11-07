@@ -22,8 +22,10 @@ Analizador de partidas de ajedrez para PC y móvil con **Stockfish 19** (Lite o 
 - **Personalización total**: 11 temas + editor de tema propio (fondo, paneles, texto), tipo de letra, esquinas, paneles de cristal, color de acento, fondo (color, degradado o imagen), 12 tableros + colores propios,
   texturas PNG por casilla o imagen de tablero completo, 31 juegos de piezas libres, recoloreado, PNG propio por pieza o juego completo de una vez,
   13 tipos de letra (incluidos sin conexión), iconos de clasificación o símbolos clásicos.
-- **Sonido**: sonidos de movimiento, captura, enroque, jaque y coronación con 4 estilos generados por la app (Madera, Suave, Clic, Retro),
-  volumen y la opción de subir tus propios sonidos (MP3/WAV/OGG, máx. 1 MB y 3 s).
+- **Sonido**: sonidos de movimiento, captura, enroque, jaque y coronación. 7 estilos: «Tablero» (grabación real de piezas de madera,
+  CC0 de el_boss en freesound.org, por defecto), «Madera» y «Suave» (generados por la app), y «Efectos», «Piano», «8 bits» y «Futurista»
+  (Enigmahack, AGPLv3+, de Lichess). Volumen y opción de subir tus propios sonidos (MP3/WAV/OGG, máx. 1 MB y 3 s).
+- **Resaltado de la última jugada** personalizable: relleno, borde o ninguno, color, intensidad, casilla de origen y color según la clasificación.
 - **Idioma**: español e inglés (Ajustes → selector arriba a la derecha). Las traducciones están en `src/i18n/en.ts`
   (`node scripts/i18n-keys.cjs` lista los textos que faltan).
 - Caché de revisiones en IndexedDB y **PWA instalable** que funciona offline (el motor queda en caché).
@@ -153,5 +155,5 @@ una subcarpeta compila con `BASE=/carpeta/ npm run build`. En el móvil: "Añadi
 
 ## Licencias
 
-Las piezas incluidas mantienen la licencia de sus autores (ver Ajustes → Datos → Créditos y `src/data/pieceSets.json`).
+Las piezas y los sonidos incluidos mantienen la licencia de sus autores (ver Ajustes → Datos → Créditos y `src/data/pieceSets.json`).
 Stockfish es GPLv3; si distribuyes la app debes publicar el código fuente bajo GPLv3. DeepChess no está afiliado a Chess.com ni a Lichess.

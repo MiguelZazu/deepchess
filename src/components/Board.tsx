@@ -101,10 +101,15 @@ export function Board({ fen, orientation, lastMove, badge, arrows = [], onMove, 
   };
 
   const squareStyles: Record<string, CSSProperties> = {};
-  if (lastMove) {
-    const tint = badge ? hexA(CLASS_META[badge.classification].color, 0.45) : hexA(look.highlight, 0.45);
-    squareStyles[lastMove.from] = { boxShadow: `inset 0 0 0 200px ${tint}` };
-    squareStyles[lastMove.to] = { boxShadow: `inset 0 0 0 200px ${tint}` };
+  const lm = look.lastMove;
+  if (lastMove && lm.style !== 'off') {
+    const base = badge && lm.classColor ? CLASS_META[badge.classification].color : look.highlight;
+    const style: CSSProperties =
+      lm.style === 'border'
+        ? { boxShadow: `inset 0 0 0 4px ${hexA(base, Math.min(1, lm.opacity + 0.4))}` }
+        : { boxShadow: `inset 0 0 0 200px ${hexA(base, lm.opacity)}` };
+    if (lm.from) squareStyles[lastMove.from] = style;
+    squareStyles[lastMove.to] = style;
   }
   for (const [sq, color] of Object.entries(highlights ?? {})) squareStyles[sq] = { boxShadow: `inset 0 0 0 200px ${color}` };
   if (queued) {

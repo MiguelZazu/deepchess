@@ -1,19 +1,29 @@
-// Move sounds. The built-in packs are synthesized with the Web Audio API (no audio files, no
-// licensing), and the user can upload their own sounds, which are stored in IndexedDB.
+// Move sounds. Packs are either recordings bundled in public/sounds (free licenses, see CREDITS below)
+// or synthesized with the Web Audio API. The user can also upload their own sounds (IndexedDB).
 import { createStore, del, get, set } from 'idb-keyval';
 import { Chess } from 'chess.js';
 import { t } from '../i18n';
 import type { CustomSoundSlot, SoundPack, SoundSettings } from './types';
 
 export type SoundEvent = 'move' | 'capture' | 'check' | 'castle' | 'promote';
+type BuiltinPack = Exclude<SoundPack, 'custom'>;
 
-export const DEFAULT_SOUND: SoundSettings = { enabled: true, volume: 0.7, pack: 'wood', custom: {} };
+export const DEFAULT_SOUND: SoundSettings = { enabled: true, volume: 0.8, pack: 'board', custom: {} };
 
-export const SOUND_PACKS: { id: Exclude<SoundPack, 'custom'>; readonly label: string; readonly hint: string }[] = [
-  { id: 'wood', get label() { return t('Madera'); }, get hint() { return t('Golpe seco de pieza de madera'); } },
+export const SOUND_PACKS: { id: BuiltinPack; readonly label: string; readonly hint: string }[] = [
+  { id: 'board', get label() { return t('Tablero'); }, get hint() { return t('Grabación real de piezas de madera'); } },
+  { id: 'wood', get label() { return t('Madera'); }, get hint() { return t('Golpe de madera generado por la app'); } },
   { id: 'soft', get label() { return t('Suave'); }, get hint() { return t('Toques discretos y redondos'); } },
-  { id: 'classic', get label() { return t('Clic'); }, get hint() { return t('Chasquido corto y nítido'); } },
-  { id: 'retro', get label() { return t('Retro'); }, get hint() { return t('Pitidos de 8 bits'); } },
+  { id: 'sfx', get label() { return t('Efectos'); }, get hint() { return t('Clics limpios, estilo videojuego'); } },
+  { id: 'piano', get label() { return t('Piano'); }, get hint() { return t('Notas de piano'); } },
+  { id: 'nes', get label() { return t('8 bits'); }, get hint() { return t('Consola retro'); } },
+  { id: 'futuristic', get label() { return t('Futurista'); }, get hint() { return t('Sonidos electrónicos'); } },
+];
+
+/** Authors and licenses of the bundled recordings (shown in Settings → Data → Credits). */
+export const SOUND_CREDITS = [
+  { name: 'Tablero', author: 'el_boss (freesound.org)', license: 'CC0 1.0', url: 'https://freesound.org/people/el_boss/packs/30764/' },
+  { name: 'Efectos, Piano, 8 bits, Futurista', author: 'Enigmahack (lichess.org)', license: 'AGPLv3+', url: 'https://github.com/lichess-org/lila/blob/master/COPYING.md' },
 ];
 
 export const MAX_SOUND_BYTES = 1024 * 1024;
@@ -45,7 +55,9 @@ function audio(): AudioContext | null {
 // Browsers only let audio start after a user gesture: unlock the context on the first one.
 if (typeof window !== 'undefined') {
   const unlock = () => {
-    if (cfg.enabled) audio();
+    if (!cfg.enabled) return;
+    audio();
+    preload(cfg.pack);
   };
   window.addEventListener('pointerdown', unlock, { once: true, capture: true });
   window.addEventListener('keydown', unlock, { once: true, capture: true });
@@ -53,7 +65,7 @@ if (typeof window !== 'undefined') {
 
 type Voice = (c: AudioContext, out: AudioNode, at: number) => void;
 
-/** Filtered noise burst (the "knock" of a piece). */
+/** Filtered noise burst (the attack of a knock). */
 function knock(type: BiquadFilterType, freq: number, q: number, dur: number, gain: number, delay = 0): Voice {
   return (c, out, at) => {
     const t0 = at + delay;
@@ -65,7 +77,7 @@ function knock(type: BiquadFilterType, freq: number, q: number, dur: number, gai
     f.Q.value = q;
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.002);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.0015);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     src.connect(f).connect(g).connect(out);
     src.start(t0, Math.random() * 0.3);
@@ -83,7 +95,7 @@ function tone(type: OscillatorType, f0: number, f1: number, dur: number, gain: n
     if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.004);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.003);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
     o.connect(g).connect(out);
     o.start(t0);
@@ -91,21 +103,35 @@ function tone(type: OscillatorType, f0: number, f1: number, dur: number, gain: n
   };
 }
 
-const at = (delay: number, voices: Voice[]): Voice[] =>
-  voices.map((v) => (c: AudioContext, out: AudioNode, t0: number) => v(c, out, t0 + delay));
+/**
+ * Wood knock by modal synthesis: a few inharmonic, quickly damped resonances (like a wooden piece
+ * hitting a board) plus a short noise attack and a low "thud".
+ */
+function woodHit(pitch: number, gain: number, delay = 0): Voice[] {
+  const modes: [number, number, number][] = [
+    [1, 0.07, 1],
+    [2.32, 0.045, 0.55],
+    [3.86, 0.03, 0.35],
+    [5.4, 0.018, 0.2],
+  ];
+  return [
+    knock('highpass', 2800, 0.8, 0.012, 0.5 * gain, delay),
+    tone('sine', 150, 95, 0.07, 0.55 * gain, delay),
+    ...modes.map(([ratio, dur, amp]) => tone('sine', pitch * ratio, pitch * ratio * 0.985, dur, 0.4 * amp * gain, delay)),
+  ];
+}
 
-const WOOD_MOVE = [knock('bandpass', 1500, 2.5, 0.06, 0.9), tone('sine', 230, 140, 0.08, 0.55)];
+const ping = (delay: number, gain = 0.12): Voice[] => [tone('sine', 1046, 1046, 0.22, gain, delay), tone('sine', 1568, 1568, 0.18, gain * 0.5, delay)];
+
 const SOFT_MOVE = [tone('sine', 520, 260, 0.09, 0.5)];
-const CLICK_MOVE = [knock('highpass', 2600, 0.7, 0.025, 0.7), tone('triangle', 330, 240, 0.05, 0.4)];
-const RETRO_MOVE = [tone('square', 440, 660, 0.06, 0.12)];
 
-const PACKS: Record<Exclude<SoundPack, 'custom'>, Record<SoundEvent, Voice[]>> = {
+const SYNTH: Record<'wood' | 'soft', Record<SoundEvent, Voice[]>> = {
   wood: {
-    move: WOOD_MOVE,
-    capture: [knock('bandpass', 1000, 2, 0.09, 1), tone('sine', 180, 90, 0.12, 0.8), knock('bandpass', 2300, 3, 0.04, 0.45, 0.035)],
-    castle: [...WOOD_MOVE, ...at(0.11, [knock('bandpass', 1300, 2.5, 0.06, 0.8), tone('sine', 200, 130, 0.08, 0.5)])],
-    check: [...WOOD_MOVE, tone('sine', 880, 880, 0.2, 0.22, 0.05), tone('triangle', 1320, 1320, 0.16, 0.1, 0.05)],
-    promote: [...WOOD_MOVE, tone('sine', 660, 660, 0.12, 0.22, 0.06), tone('sine', 990, 990, 0.18, 0.22, 0.13)],
+    move: woodHit(720, 1),
+    capture: [...woodHit(560, 1.15), ...woodHit(840, 0.7, 0.045)],
+    castle: [...woodHit(700, 0.9), ...woodHit(780, 0.9, 0.12)],
+    check: [...woodHit(720, 1), ...ping(0.05)],
+    promote: [...woodHit(720, 1), tone('sine', 784, 784, 0.12, 0.12, 0.06), tone('sine', 1175, 1175, 0.18, 0.12, 0.13)],
   },
   soft: {
     move: SOFT_MOVE,
@@ -114,21 +140,67 @@ const PACKS: Record<Exclude<SoundPack, 'custom'>, Record<SoundEvent, Voice[]>> =
     check: [...SOFT_MOVE, tone('sine', 784, 784, 0.2, 0.25, 0.05), tone('sine', 1175, 1175, 0.25, 0.22, 0.14)],
     promote: [tone('sine', 523, 523, 0.12, 0.3), tone('sine', 659, 659, 0.12, 0.3, 0.08), tone('sine', 784, 784, 0.2, 0.3, 0.16)],
   },
-  classic: {
-    move: CLICK_MOVE,
-    capture: [knock('bandpass', 1800, 1, 0.05, 1), tone('triangle', 210, 120, 0.09, 0.6)],
-    castle: [...CLICK_MOVE, ...at(0.09, CLICK_MOVE)],
-    check: [...CLICK_MOVE, tone('sine', 990, 990, 0.16, 0.2, 0.04), tone('sine', 990, 990, 0.16, 0.18, 0.15)],
-    promote: [...CLICK_MOVE, tone('triangle', 784, 1175, 0.18, 0.25, 0.05)],
-  },
-  retro: {
-    move: RETRO_MOVE,
-    capture: [tone('square', 660, 200, 0.13, 0.13)],
-    castle: [...RETRO_MOVE, tone('square', 550, 825, 0.06, 0.12, 0.08)],
-    check: [tone('square', 880, 880, 0.07, 0.12), tone('square', 1175, 1175, 0.1, 0.12, 0.09)],
-    promote: [523, 659, 784, 1047].map((f, i) => tone('square', f, f, 0.06, 0.11, i * 0.06)),
-  },
 };
+
+// ---------------------------------------------------------------- recorded packs
+
+type FileSlot = 'move' | 'capture' | 'check';
+const FILE_PACKS: Record<Exclude<BuiltinPack, 'wood' | 'soft'>, FileSlot[]> = {
+  board: ['move', 'capture'],
+  sfx: ['move', 'capture', 'check'],
+  piano: ['move', 'capture', 'check'],
+  nes: ['move', 'capture', 'check'],
+  futuristic: ['move', 'capture', 'check'],
+};
+const fileBuffers = new Map<string, Promise<AudioBuffer | null>>();
+
+/** Decodes an audio file and drops leading silence so the sound starts right on the move. */
+async function decodeTrimmed(c: AudioContext, data: ArrayBuffer): Promise<AudioBuffer> {
+  const buf = await c.decodeAudioData(data);
+  const ch = buf.getChannelData(0);
+  let peak = 0;
+  for (let i = 0; i < ch.length; i++) peak = Math.max(peak, Math.abs(ch[i]));
+  let start = 0;
+  while (start < ch.length && Math.abs(ch[start]) < peak * 0.05) start++;
+  start = Math.max(0, start - Math.round(buf.sampleRate * 0.002));
+  if (start < buf.sampleRate * 0.005) return buf;
+  const out = c.createBuffer(buf.numberOfChannels, buf.length - start, buf.sampleRate);
+  for (let i = 0; i < buf.numberOfChannels; i++) out.copyToChannel(buf.getChannelData(i).subarray(start), i);
+  return out;
+}
+
+function fileBuffer(pack: keyof typeof FILE_PACKS, slot: FileSlot): Promise<AudioBuffer | null> {
+  const key = `${pack}/${slot}`;
+  if (!fileBuffers.has(key)) {
+    const c = audio();
+    fileBuffers.set(
+      key,
+      c
+        ? fetch(`${import.meta.env.BASE_URL}sounds/${key}.mp3`)
+            .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.statusText))))
+            .then((b) => decodeTrimmed(c, b))
+            .catch(() => null)
+        : Promise.resolve(null),
+    );
+  }
+  return fileBuffers.get(key)!;
+}
+
+function preload(pack: SoundPack) {
+  if (pack in FILE_PACKS) for (const s of FILE_PACKS[pack as keyof typeof FILE_PACKS]) void fileBuffer(pack as keyof typeof FILE_PACKS, s);
+}
+
+function playBuffer(c: AudioContext, buf: AudioBuffer, at: number, gain = 1) {
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  if (gain === 1) src.connect(master!);
+  else {
+    const g = c.createGain();
+    g.gain.value = gain;
+    src.connect(g).connect(master!);
+  }
+  src.start(at);
+}
 
 // ---------------------------------------------------------------- custom sounds
 
@@ -145,7 +217,7 @@ async function decode(blob: Blob): Promise<AudioBuffer> {
   const c = audio();
   if (!c) throw new Error(t('Este dispositivo no puede reproducir sonido.'));
   try {
-    return await c.decodeAudioData(await blob.arrayBuffer());
+    return await decodeTrimmed(c, await blob.arrayBuffer());
   } catch {
     throw new Error(t('No se pudo leer el audio.'));
   }
@@ -194,10 +266,15 @@ export async function customSoundNames(): Promise<Partial<Record<CustomSoundSlot
 
 // ---------------------------------------------------------------- public API
 
+const KNOWN: SoundPack[] = ['board', 'wood', 'soft', 'sfx', 'piano', 'nes', 'futuristic', 'custom'];
+/** Packs from older versions that no longer exist fall back to the default. */
+export const normalizePack = (p: string): SoundPack => (KNOWN.includes(p as SoundPack) ? (p as SoundPack) : DEFAULT_SOUND.pack);
+
 export function configureSound(s: SoundSettings) {
-  cfg = s;
-  if (master) master.gain.value = s.volume;
-  if (s.pack === 'custom') void loadCustom(s.custom);
+  cfg = { ...s, pack: normalizePack(s.pack) };
+  if (master) master.gain.value = cfg.volume;
+  if (cfg.pack === 'custom') void loadCustom(cfg.custom);
+  else if (ctx) preload(cfg.pack);
 }
 
 /** Plays the sound of an event. `preview` plays even if sounds are off (used by the settings). */
@@ -206,27 +283,37 @@ export function playSound(ev: SoundEvent, opts: { preview?: boolean; pack?: Soun
   if (typeof document !== 'undefined' && document.hidden) return;
   const c = audio();
   if (!c || !master) return;
-  const pack = opts.pack ?? cfg.pack;
+  const pack = normalizePack(opts.pack ?? cfg.pack);
   const now = c.currentTime + 0.005;
+
   if (pack === 'custom') {
     const buf = (ev === 'capture' ? buffers.capture : undefined) ?? buffers.move;
-    if (buf) {
-      const src = c.createBufferSource();
-      src.buffer = buf;
-      src.connect(master);
-      src.start(now);
-      return;
-    }
+    if (buf) return playBuffer(c, buf, now);
+  } else if (pack in FILE_PACKS) {
+    const fp = pack as keyof typeof FILE_PACKS;
+    const slots = FILE_PACKS[fp];
+    const slot: FileSlot = ev === 'capture' ? 'capture' : ev === 'check' && slots.includes('check') ? 'check' : 'move';
+    void fileBuffer(fp, slot).then((buf) => {
+      if (!buf) return SYNTH.wood[ev].forEach((v) => v(c, master!, c.currentTime + 0.005));
+      const t0 = Math.max(now, c.currentTime + 0.002);
+      playBuffer(c, buf, t0);
+      // Recordings without their own check/castle/promotion sound get a short extra cue.
+      if (ev === 'castle') playBuffer(c, buf, t0 + 0.12, 0.8);
+      if (ev === 'check' && !slots.includes('check')) ping(0.06).forEach((v) => v(c, master!, t0));
+      if (ev === 'promote') [tone('sine', 784, 784, 0.12, 0.1, 0.06), tone('sine', 1175, 1175, 0.18, 0.1, 0.13)].forEach((v) => v(c, master!, t0));
+    });
+    return;
   }
-  const voices = PACKS[pack === 'custom' ? 'wood' : pack][ev];
-  for (const v of voices) v(c, master, now);
+  const synth = pack === 'soft' ? SYNTH.soft : SYNTH.wood;
+  for (const v of synth[ev]) v(c, master, now);
 }
 
 /** Plays a short demo: move, capture and check. */
 export function playDemo(pack?: SoundPack) {
+  if (pack) preload(pack);
   playSound('move', { preview: true, pack });
-  setTimeout(() => playSound('capture', { preview: true, pack }), 380);
-  setTimeout(() => playSound('check', { preview: true, pack }), 760);
+  setTimeout(() => playSound('capture', { preview: true, pack }), 420);
+  setTimeout(() => playSound('check', { preview: true, pack }), 840);
 }
 
 // ---------------------------------------------------------------- move classification

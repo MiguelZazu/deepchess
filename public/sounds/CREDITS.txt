@@ -1,0 +1,13 @@
+Sound credits
+
+board/      "Piece Placement" and "Piece Capture" from the "Chess Puzzle Blitz SFX" pack
+            by el_boss
+            https://freesound.org/people/el_boss/packs/30764/
+            License: CC0 1.0 (public domain)
+
+sfx/, piano/, nes/, futuristic/
+            by Enigmahack, from the Lichess source code (lila/public/sound)
+            https://github.com/lichess-org/lila/blob/master/COPYING.md
+            License: GNU AGPL v3 or later
+
+The "Madera" (wood) and "Suave" (soft) sounds are synthesized at runtime by src/lib/sound.ts.
