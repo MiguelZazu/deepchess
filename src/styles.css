@@ -1883,15 +1883,21 @@ input[type='range'] {
   align-items: center;
   gap: 6px;
 }
+/* Puzzles / rush: the page uses the whole width so the board can be big; the board column is
+   sized so that the side panel (300–380px) always fits next to it and never covers it. */
+.page.train {
+  max-width: none;
+  padding: 16px 24px 20px;
+}
 .train-layout {
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(300px, 380px);
+  grid-template-columns: max-content minmax(300px, 380px);
   gap: 22px;
   justify-content: center;
   align-items: start;
 }
 .train-layout .board-col {
-  width: min(calc(100vh - 156px), calc(100vw - var(--sidebar) - 420px));
+  width: min(calc(100vh - 132px), calc(100vw - var(--sidebar) - 48px - 22px - 320px));
 }
 .train-layout .panel {
   max-height: none;
