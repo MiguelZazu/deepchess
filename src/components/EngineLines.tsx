@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { formatEval, numberedLine } from '../lib/chess';
 import { ENGINES, type EngineId } from '../engine/stockfish';
 import type { Classification, EngineLineView, Settings } from '../lib/types';
@@ -23,6 +24,9 @@ interface Props {
   onPlayLine: (uci: string[]) => void;
   /** Classification of each line (colours the arrows / dots). */
   classes?: Classification[];
+  /** When given, the options row (lines, time, arrows) folds behind a button in the header. */
+  optionsOpen?: boolean;
+  onToggleOptions?: () => void;
 }
 
 export function EngineLines(p: Props) {
@@ -64,8 +68,20 @@ export function EngineLines(p: Props) {
             (p.blockedReason ?? 'apagado')
           )}
         </div>
+        {p.onToggleOptions && (
+          <button
+            className={`icon-btn small engine-fold ${p.optionsOpen ? 'open' : ''}`}
+            onClick={p.onToggleOptions}
+            aria-expanded={!!p.optionsOpen}
+            aria-label={t('Opciones del motor')}
+            title={t('Opciones del motor')}
+          >
+            <ChevronDown size={16} />
+          </button>
+        )}
       </div>
 
+      {(!p.onToggleOptions || p.optionsOpen) && (
       <div className="engine-opts">
         <div className="seg-mini" role="group" aria-label={t('Número de líneas')}>
           <span className="opt-label">{t('Líneas')}</span>
@@ -99,6 +115,7 @@ export function EngineLines(p: Props) {
         </div>
         {p.threads > 1 && <span className="opt-label">{p.threads}{' '}{t('hilos')}</span>}
       </div>
+      )}
 
       {enabled && (
         <div className="engine-lines">

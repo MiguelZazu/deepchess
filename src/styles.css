@@ -1103,6 +1103,29 @@ button.chip:hover {
   top: 10px;
   max-height: calc(100vh - 20px);
 }
+/* Only the move list gives up space when the panel is short; everything else keeps its size
+   (otherwise the engine lines got squeezed out of view once the review started). */
+.panel > * {
+  flex-shrink: 0;
+}
+.panel > .tab-body {
+  flex: 1 1 auto;
+  min-height: 120px;
+}
+.panel {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.engine-fold {
+  margin-left: 2px;
+  transition: transform 0.15s;
+}
+.engine-fold.open {
+  transform: rotate(180deg);
+}
+.engine-lines .engine-line .line-text {
+  min-width: 0;
+}
 .nav-in-col {
   display: none;
 }
@@ -1117,6 +1140,12 @@ button.chip:hover {
   display: flex;
   justify-content: center;
   padding: 4px 12px 14px;
+}
+.summary-reanalyze {
+  padding: 0 12px 14px;
+}
+.summary-reanalyze:empty {
+  display: none;
 }
 .start-review .btn {
   width: 100%;

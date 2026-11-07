@@ -139,7 +139,8 @@ export default function App() {
       id: 'train',
       get label() { return t('Problemas'); },
       icon: Puzzle,
-      onClick: () => navigate({ name: 'train', tab: route.name === 'train' ? route.tab : 'puzzles' }),
+      // On phones «Contrarreloj» has its own entry, so «Problemas» always opens the puzzles.
+      onClick: () => navigate({ name: 'train', tab: !mobile && route.name === 'train' ? route.tab : 'puzzles' }),
       active: route.name === 'train' && (!mobile || route.tab === 'puzzles'),
     },
     {

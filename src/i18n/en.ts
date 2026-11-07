@@ -277,6 +277,7 @@ export const EN: Record<string, string> = {
   'Sonidos electrónicos': 'Electronic sounds',
   'Sonidos «{name}»': 'Sounds "{name}"',
   'Por defecto': 'Default',
+  'Opciones del motor': 'Engine options',
   'Clásico': 'Classic',
   'Grabación de piezas sobre tablero (por defecto)': 'Recording of pieces on a board (default)',
   'licencia de Creazilla': 'Creazilla licence',

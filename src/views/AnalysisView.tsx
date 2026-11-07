@@ -97,6 +97,8 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
   // Phones: a game opens on its summary; «Empezar revisión» switches to the board.
   const [mView, setMView] = useState<'summary' | 'board'>(game ? 'summary' : 'board');
   const [sheet, setSheet] = useState<'moves' | 'engine' | 'more' | null>(null);
+  // Desktop: the engine options fold away once the review starts (the lines stay visible).
+  const [engineOpts, setEngineOpts] = useState(true);
 
   const engine = useEngineState();
 
@@ -154,6 +156,7 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
     setDepth(settings.reviewDepth);
     setMView(game ? 'summary' : 'board');
     setSheet(null);
+    setEngineOpts(true);
     const persp = perspective?.toLowerCase();
     setOrientation(game && persp && game.black.name.toLowerCase() === persp ? 'black' : 'white');
     if (!game || !parsed) return;
@@ -407,7 +410,10 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
   // (with the current move highlighted) takes the summary's place.
   const lastPly = useRef(ply);
   useEffect(() => {
-    if (ply !== lastPly.current && ply > 0 && !variation) setTab('moves');
+    if (ply !== lastPly.current && ply > 0 && !variation) {
+      setTab('moves');
+      setEngineOpts(false);
+    }
     lastPly.current = ply;
   }, [ply, variation]);
   useEffect(() => {
@@ -905,6 +911,8 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
           settings={settings}
           onSettings={onSettings}
           onPlayLine={onPlayLine}
+          optionsOpen={engineOpts}
+          onToggleOptions={() => setEngineOpts((o) => !o)}
         />
 
         {progressEl}
@@ -914,7 +922,8 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
           <EvalGraph positions={positions} total={graphTotal} moves={review?.moves} ply={variation ? variation.base : ply} onSelect={selectPly} />
         )}
 
-        {reviewCta}
+        {/* Once there is a review, «Re-analizar» lives in the summary tab to leave room for the moves. */}
+        {!review && reviewCta}
 
         <div className="tabs">
           <button className={tab === 'review' ? 'active' : ''} onClick={() => setTab('review')}>
@@ -935,6 +944,7 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
                     <Play size={16} /> {t('Empezar revisión')}
                   </button>
                 </div>
+                <div className="summary-reanalyze">{reviewCta}</div>
               </>
             ) : (
               <div className="empty-hint">
