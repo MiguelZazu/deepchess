@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Chess, type Move } from 'chess.js';
 import {
+  BarChart3,
   ChevronFirst,
   ChevronLast,
   ChevronLeft,
   ChevronRight,
   Copy,
+  Cpu,
   ExternalLink,
   FlipVertical2,
+  ListOrdered,
+  MoreHorizontal,
+  Play,
   RotateCcw,
   Sparkles,
   Undo2,
 } from 'lucide-react';
+import { FitBoard, MScreen, Sheet, TopBarSlot, useIsMobile } from '../components/mobile';
+import { CLASS_META, ClassIcon } from '../components/ClassIcon';
+import { formatEval, numberedLine } from '../lib/chess';
 import { Board, type BoardArrow } from '../components/Board';
 import { EvalBar } from '../components/EvalBar';
 import { EvalGraph } from '../components/EvalGraph';
@@ -22,7 +30,7 @@ import { EngineLines } from '../components/EngineLines';
 import { liveEngine, reviewEngine, useEngineState } from '../engine/instances';
 import { useLook } from '../lib/look';
 import { hexA } from '../lib/appearance';
-import { classifySingleMove, linesToView, reviewGame, terminalAnalysis, type ReviewProgress } from '../analysis/review';
+import { classifyCandidates, classifySingleMove, linesToView, reviewGame, terminalAnalysis, type ReviewProgress } from '../analysis/review';
 import { materialInfo, parsePgn, type ParsedGame } from '../lib/chess';
 import { summaryFromMoves } from '../lib/pgn';
 import { getReview, pushRecent, putReview } from '../lib/storage';
@@ -85,6 +93,10 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
   const [variation, setVariation] = useState<Variation | null>(null);
   const [orientation, setOrientation] = useState<'white' | 'black'>('white');
   const [tab, setTab] = useState<'review' | 'moves'>('review');
+  const mobile = useIsMobile();
+  // Phones: a game opens on its summary; «Empezar revisión» switches to the board.
+  const [mView, setMView] = useState<'summary' | 'board'>(game ? 'summary' : 'board');
+  const [sheet, setSheet] = useState<'moves' | 'engine' | 'more' | null>(null);
 
   const engine = useEngineState();
 
@@ -140,6 +152,8 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
     setPly(0);
     setFreeMoves([]);
     setDepth(settings.reviewDepth);
+    setMView(game ? 'summary' : 'board');
+    setSheet(null);
     const persp = perspective?.toLowerCase();
     setOrientation(game && persp && game.black.name.toLowerCase() === persp ? 'black' : 'white');
     if (!game || !parsed) return;
@@ -208,7 +222,7 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
       .analyze(fen, {
         depth: settings.liveMaxTime ? undefined : settings.liveDepth,
         movetime: settings.liveMaxTime ? settings.liveMaxTime * 1000 : undefined,
-        multipv: settings.liveLines,
+        multipv: Math.max(settings.liveLines, settings.liveArrows),
         signal: ac.signal,
         onInfo: (lines, d) => {
           pending = { lines, depth: d };
@@ -238,6 +252,7 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
     settings.liveEngine,
     settings.liveDepth,
     settings.liveLines,
+    settings.liveArrows,
     settings.liveMaxTime,
     settings.engine,
     settings.threads,
@@ -426,10 +441,15 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
   ) {
     arrows.push({ from: moveInfo.bestUci.slice(0, 2), to: moveInfo.bestUci.slice(2, 4), color: hexA(look.bestArrow, 0.85) });
   }
-  if (settings.showLiveArrow && liveFresh && live.lines[0].uci[0]) {
-    const u = live.lines[0].uci[0];
-    if (!arrows.some((a) => a.from === u.slice(0, 2) && a.to === u.slice(2, 4)))
-      arrows.push({ from: u.slice(0, 2), to: u.slice(2, 4), color: hexA(look.liveArrow, 0.8) });
+  // Top engine moves: one arrow each, coloured by its classification (best drawn last, on top).
+  const candClasses = useMemo(() => (liveFresh ? classifyCandidates(currentFen, live.lines) : []), [liveFresh, currentFen, live.lines]);
+  if (liveFresh) {
+    const n = Math.min(settings.liveArrows, live.lines.length);
+    for (let i = n - 1; i >= 0; i--) {
+      const u = live.lines[i].uci[0];
+      if (!u || arrows.some((a) => a.from === u.slice(0, 2) && a.to === u.slice(2, 4))) continue;
+      arrows.push({ from: u.slice(0, 2), to: u.slice(2, 4), color: hexA(CLASS_META[candClasses[i] ?? 'best'].color, i === 0 ? 0.92 : 0.72) });
+    }
   }
 
   // ---------- Players / clocks ----------
@@ -476,6 +496,280 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
       <div className="page">
         <div className="card error-card">{t('No se pudo leer el PGN de esta partida.')}</div>
       </div>
+    );
+  }
+
+  const coachEl = shownUserReview ? (
+    <CoachCard move={shownUserReview} after={evalCache.current.get(shownUserReview.fenAfter)} opening={opening} onShowBest={showBestLine} />
+  ) : userMove && classifying ? (
+    <div className="coach">
+      <div className="coach-head">
+        <div className="coach-avatar">{t('DC')}</div>
+        <div>
+          <div className="coach-title">
+            {t('Evaluando')}{' '}{userMove.san}…
+          </div>
+          <div className="coach-sub">{t('Calculando la calidad de tu jugada.')}</div>
+        </div>
+      </div>
+    </div>
+  ) : review ? (
+    <CoachCard move={currentReview} after={review.positions[ply]} opening={opening} onShowBest={showBestLine} />
+  ) : null;
+
+  const progressEl = reviewing && progress && (
+    <div className="card progress-card">
+      <div className="progress-top">
+        <span>
+          <Sparkles size={15} />{' '}{t('Revisando con')}{' '}{engine.name}{' '}{t('· prof.')}{' '}{depth}
+        </span>
+        <span className="mono">{pct}%</span>
+      </div>
+      <div className="progress">
+        <div style={{ width: `${pct}%` }} />
+      </div>
+      <div className="progress-bottom">
+        <span className="muted">
+          {t('Posición')}{' '}{progress.done}{' '}{t('de')}{' '}{progress.total}
+        </span>
+        <button className="btn small ghost" onClick={() => abortRef.current?.abort()}>
+          {t('Cancelar')}
+        </button>
+      </div>
+    </div>
+  );
+
+  const reviewCta = !reviewing && mainMoves.length > 0 && (
+    <div className="review-cta">
+      <select value={depth} onChange={(e) => setDepth(Number(e.target.value))} aria-label={t('Profundidad')}>
+        {DEPTHS.map((d) => (
+          <option key={d} value={d}>
+            {t('Profundidad')}{' '}{d}
+            {d <= 12 ? ` · ${t('rápida')}` : d >= 18 ? ` · ${t('profunda')}` : ''}
+          </option>
+        ))}
+      </select>
+      <button className="btn primary" onClick={() => startReview(depth)}>
+        <Sparkles size={16} /> {review ? t('Re-analizar') : t('Revisar partida')}
+      </button>
+    </div>
+  );
+
+  const flip = () => setOrientation((o) => (o === 'white' ? 'black' : 'white'));
+  const resetFree = () => {
+    setFreeMoves([]);
+    setPly(0);
+    setReview(null);
+  };
+
+  if (mobile && game && mView === 'summary') {
+    return (
+      <div className="m-pad m-summary">
+        <div className="card m-game-head">
+          <b>
+            {white.name}{white.rating ? ` (${white.rating})` : ''} – {black.name}{black.rating ? ` (${black.rating})` : ''}
+          </b>
+          <div className="panel-meta">
+            <span className="muted">
+              {resultText(game)} · {new Date(game.endTime).toLocaleDateString()}
+            </span>
+            {opening && <span className="opening">{opening}</span>}
+            {safeUrl(game.url) && (
+              <a href={safeUrl(game.url)} target="_blank" rel="noreferrer" className="ext-link">
+                {t('Ver original')}{' '}<ExternalLink size={12} />
+              </a>
+            )}
+          </div>
+        </div>
+        {progressEl}
+        {positions.length > 0 && (
+          <div className="m-graph">
+            <EvalGraph
+              positions={positions}
+              total={graphTotal}
+              moves={review?.moves}
+              ply={ply}
+              onSelect={(p) => {
+                selectPly(p);
+                setMView('board');
+              }}
+              height={70}
+            />
+          </div>
+        )}
+        {review && <ReviewSummary review={review} white={white} black={black} onJump={(c, col) => { jumpTo(c, col); setMView('board'); }} />}
+        {!review && !reviewing && reviewCta}
+        <button className="btn primary big-cta m-start" onClick={() => setMView('board')}>
+          <Play size={18} /> {review ? t('Empezar revisión') : t('Ver partida')}
+        </button>
+        {review && reviewCta}
+      </div>
+    );
+  }
+
+  if (mobile) {
+    const shownLines = liveFresh ? live.lines.slice(0, Math.min(settings.liveLines, 3)) : [];
+    return (
+      <MScreen className="m-analysis">
+        <TopBarSlot>
+          {game && (
+            <button className="icon-btn" onClick={() => setMView('summary')} aria-label={t('Resumen')} title={t('Resumen')}>
+              <BarChart3 size={20} />
+            </button>
+          )}
+          <button className="icon-btn" onClick={() => setSheet('more')} aria-label={t('Más opciones')} title={t('Más opciones')}>
+            <MoreHorizontal size={20} />
+          </button>
+        </TopBarSlot>
+
+        {reviewing && progress && (
+          <div className="m-progress" title={`${pct}%`}>
+            <i style={{ width: `${pct}%` }} />
+          </div>
+        )}
+        {positions.length > 0 && (
+          <div className="m-graph">
+            <EvalGraph positions={positions} total={graphTotal} moves={review?.moves} ply={variation ? variation.base : ply} onSelect={selectPly} height={46} />
+          </div>
+        )}
+        {coachEl && <div className="m-coach">{coachEl}</div>}
+        {settings.liveEngine && !reviewing && (
+          <div className="m-lines" onClick={() => setSheet('engine')}>
+            {live.terminal && live.fen === currentFen ? (
+              <div className="m-line muted">{live.terminal}</div>
+            ) : shownLines.length ? (
+              shownLines.map((l, i) => (
+                <div key={i} className="m-line">
+                  {i < settings.liveArrows && candClasses[i] && <span className="line-dot" style={{ background: CLASS_META[candClasses[i]].color }} />}
+                  <span className={`eval-chip ${l.eval.type === 'mate' ? (l.eval.value > 0 ? 'w' : 'b') : l.eval.value >= 0 ? 'w' : 'b'}`}>{formatEval(l.eval)}</span>
+                  <span className="mono line-text">{numberedLine(currentFen, l.san.slice(0, 8))}</span>
+                </div>
+              ))
+            ) : (
+              <div className="m-line muted">{t('Calculando…')}</div>
+            )}
+          </div>
+        )}
+        {variation && (
+          <div className="variation-banner m-variation">
+            <span>{variation.moves.slice(0, variation.idx).map((m) => m.san).join(' ') || '—'}</span>
+            <button
+              className="btn small"
+              onClick={() => {
+                setPly(variation.base);
+                setVariation(null);
+              }}
+            >
+              <Undo2 size={14} />{' '}{t('Volver a la partida')}
+            </button>
+          </div>
+        )}
+
+        <FitBoard extraW={12} extraH={60}>
+          {playerBar(topColor)}
+          <div className="board-row">
+            <EvalBar evaluation={barEval} orientation={orientation} />
+            <Board
+              fen={currentFen}
+              orientation={orientation}
+              lastMove={lastMove ? { from: lastMove.from, to: lastMove.to } : undefined}
+              badge={moveInfo ? { square: moveInfo.to, classification: moveInfo.classification } : undefined}
+              arrows={arrows}
+              onMove={onBoardMove}
+            />
+          </div>
+          {playerBar(bottomColor)}
+        </FitBoard>
+
+        <MoveStrip
+          moves={mainMoves}
+          reviews={review?.moves}
+          ply={variation ? -1 : ply}
+          startMoveNumber={Number(startFen.split(' ')[5] ?? 1)}
+          onSelect={selectPly}
+        />
+        <div className="m-controls">
+          <button className="icon-btn" onClick={() => setSheet('moves')} aria-label={t('Jugadas')}>
+            <ListOrdered size={20} />
+          </button>
+          <button className="icon-btn" onClick={() => go('first')} aria-label={t('Inicio')}>
+            <ChevronFirst size={22} />
+          </button>
+          <button className="icon-btn big" onClick={() => go('prev')} aria-label={t('Anterior')}>
+            <ChevronLeft size={28} />
+          </button>
+          <button className="icon-btn big" onClick={() => go('next')} aria-label={t('Siguiente')}>
+            <ChevronRight size={28} />
+          </button>
+          <button className="icon-btn" onClick={() => go('last')} aria-label={t('Final')}>
+            <ChevronLast size={22} />
+          </button>
+          <button className="icon-btn" onClick={() => setSheet('engine')} aria-label={t('Motor')}>
+            <Cpu size={20} />
+          </button>
+        </div>
+
+        <Sheet open={sheet === 'moves'} title={t('Jugadas')} onClose={() => setSheet(null)}>
+          <MoveList
+            moves={mainMoves}
+            reviews={review?.moves}
+            ply={variation ? -1 : ply}
+            startMoveNumber={Number(startFen.split(' ')[5] ?? 1)}
+            onSelect={(p) => {
+              selectPly(p);
+              setSheet(null);
+            }}
+          />
+        </Sheet>
+        <Sheet open={sheet === 'engine'} title={t('Motor')} onClose={() => setSheet(null)}>
+          <EngineLines
+            fen={currentFen}
+            lines={live.fen === currentFen ? live.lines.slice(0, settings.liveLines) : []}
+            classes={candClasses}
+            depth={live.fen === currentFen ? live.depth : 0}
+            running={live.running}
+            enabled={settings.liveEngine && !reviewing}
+            blockedReason={reviewing ? t('pausado durante la revisión') : undefined}
+            terminal={live.fen === currentFen ? live.terminal : undefined}
+            engineStatus={engine.status}
+            threads={engine.threads}
+            startedAt={live.startedAt ?? Date.now()}
+            settings={settings}
+            onSettings={onSettings}
+            onPlayLine={(u) => {
+              onPlayLine(u);
+              setSheet(null);
+            }}
+          />
+        </Sheet>
+        <Sheet open={sheet === 'more'} title={t('Opciones')} onClose={() => setSheet(null)}>
+          <div className="m-sheet-list">
+            <button className="btn" onClick={() => { flip(); setSheet(null); }}>
+              <FlipVertical2 size={16} /> {t('Girar tablero')}
+            </button>
+            <button className="btn" onClick={() => { navigator.clipboard?.writeText(currentFen); setSheet(null); }}>
+              <Copy size={16} /> {t('Copiar FEN')}
+            </button>
+            {isFree && freeMoves.length > 0 && (
+              <button className="btn" onClick={() => { resetFree(); setSheet(null); }}>
+                <RotateCcw size={16} /> {t('Reiniciar tablero')}
+              </button>
+            )}
+            {game && (
+              <button className="btn" onClick={() => { setMView('summary'); setSheet(null); }}>
+                <BarChart3 size={16} /> {t('Resumen')}
+              </button>
+            )}
+            {safeUrl(game?.url) && (
+              <a className="btn" href={safeUrl(game?.url)} target="_blank" rel="noreferrer">
+                <ExternalLink size={16} /> {t('Ver original')}
+              </a>
+            )}
+          </div>
+          {progressEl}
+          {reviewCta}
+        </Sheet>
+      </MScreen>
     );
   }
 
@@ -580,7 +874,8 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
 
         <EngineLines
           fen={currentFen}
-          lines={live.fen === currentFen ? live.lines : []}
+          lines={live.fen === currentFen ? live.lines.slice(0, settings.liveLines) : []}
+          classes={candClasses}
           depth={live.fen === currentFen ? live.depth : 0}
           running={live.running}
           enabled={settings.liveEngine && !reviewing}
@@ -594,68 +889,14 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
           onPlayLine={onPlayLine}
         />
 
-        {reviewing && progress && (
-          <div className="card progress-card">
-            <div className="progress-top">
-              <span>
-                <Sparkles size={15} />{' '}{t('Revisando con')}{' '}{engine.name}{' '}{t('· prof.')}{' '}{depth}
-              </span>
-              <span className="mono">{pct}%</span>
-            </div>
-            <div className="progress">
-              <div style={{ width: `${pct}%` }} />
-            </div>
-            <div className="progress-bottom">
-              <span className="muted">
-                {t('Posición')}{' '}{progress.done}{' '}{t('de')}{' '}{progress.total}
-              </span>
-              <button className="btn small ghost" onClick={() => abortRef.current?.abort()}>
-                {t('Cancelar')}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {shownUserReview ? (
-          <CoachCard
-            move={shownUserReview}
-            after={evalCache.current.get(shownUserReview.fenAfter)}
-            opening={opening}
-            onShowBest={showBestLine}
-          />
-        ) : userMove && classifying ? (
-          <div className="coach">
-            <div className="coach-head">
-              <div className="coach-avatar">{t('DC')}</div>
-              <div>
-                <div className="coach-title">{t('Evaluando')}{' '}{userMove.san}…</div>
-                <div className="coach-sub">{t('Calculando la calidad de tu jugada.')}</div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          review && <CoachCard move={currentReview} after={review.positions[ply]} opening={opening} onShowBest={showBestLine} />
-        )}
+        {progressEl}
+        {coachEl}
 
         {positions.length > 0 && (
           <EvalGraph positions={positions} total={graphTotal} moves={review?.moves} ply={variation ? variation.base : ply} onSelect={selectPly} />
         )}
 
-        {!reviewing && mainMoves.length > 0 && (
-          <div className="review-cta">
-            <select value={depth} onChange={(e) => setDepth(Number(e.target.value))} aria-label={t('Profundidad')}>
-              {DEPTHS.map((d) => (
-                <option key={d} value={d}>
-                  {t('Profundidad')}{' '}{d}
-                  {d <= 12 ? ` · ${t('rápida')}` : d >= 18 ? ` · ${t('profunda')}` : ''}
-                </option>
-              ))}
-            </select>
-            <button className="btn primary" onClick={() => startReview(depth)}>
-              <Sparkles size={16} /> {review ? t('Re-analizar') : t('Revisar partida')}
-            </button>
-          </div>
-        )}
+        {reviewCta}
 
         <div className="tabs">
           <button className={tab === 'review' ? 'active' : ''} onClick={() => setTab('review')}>
@@ -690,6 +931,47 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
           )}
         </div>
       </aside>
+    </div>
+  );
+}
+
+/** Horizontal, scrollable list of moves (phone layout). */
+function MoveStrip({
+  moves,
+  reviews,
+  ply,
+  startMoveNumber,
+  onSelect,
+}: {
+  moves: Move[];
+  reviews?: MoveReview[];
+  ply: number;
+  startMoveNumber: number;
+  onSelect: (ply: number) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current?.querySelector<HTMLElement>('.ms-move.active');
+    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [ply]);
+  if (!moves.length) return <div className="m-movestrip muted">{t('Mueve una pieza para empezar.')}</div>;
+  const firstBlack = moves[0]?.color === 'b';
+  return (
+    <div className="m-movestrip" ref={ref}>
+      {moves.map((m, i) => {
+        const p = i + 1;
+        const num = startMoveNumber + Math.floor((i + (firstBlack ? 1 : 0)) / 2);
+        const r = reviews?.[i];
+        return (
+          <span key={i} className="ms-item">
+            {(m.color === 'w' || i === 0) && <span className="ms-num">{num}.{m.color === 'b' ? '..' : ''}</span>}
+            <button className={`ms-move ${p === ply ? 'active' : ''}`} onClick={() => onSelect(p)}>
+              {r && <ClassIcon c={r.classification} size={14} />}
+              {m.san}
+            </button>
+          </span>
+        );
+      })}
     </div>
   );
 }

@@ -202,6 +202,8 @@ export interface Settings {
   liveEngine: boolean;
   showBestArrow: boolean;
   showLiveArrow: boolean;
+  /** Arrows for the engine's top moves (0-5), coloured by how good each one is. */
+  liveArrows: number;
   appearance: Appearance;
   sound: SoundSettings;
   /** Version of the defaults the settings were last migrated to. */

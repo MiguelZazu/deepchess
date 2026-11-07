@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { Board } from '../../components/Board';
+import { FitBoard, MScreen, TopBarSlot, useIsMobile } from '../../components/mobile';
 import { useLook } from '../../lib/look';
 import { hexA } from '../../lib/appearance';
 import { t, tr } from '../../i18n';
@@ -40,6 +41,7 @@ export function OpeningsTab() {
   const [progress, setProgress] = useState<Progress>(loadProgress);
   const [mode, setMode] = useState<Mode>(() => (localStorage.getItem('dc:open-mode') as Mode) || 'courses');
   const [open, setOpen] = useState<{ course: string; line: string } | null>(null);
+  const mobile = useIsMobile();
 
   useEffect(() => {
     loadCourses().then(setCourses);
@@ -78,8 +80,17 @@ export function OpeningsTab() {
   const course = open && courses.find((c) => c.id === open.course);
 
   return (
-    <div className="openings2">
-      {!course && (
+    <div className={`openings2 ${mobile ? 'm-pad' : ''}`}>
+      {mobile && !course && (
+        <TopBarSlot>
+          <select value={mode} onChange={(e) => switchMode(e.target.value as Mode)} aria-label={t('Modo')}>
+            <option value="courses">{t('Aperturas')}</option>
+            <option value="practice">{t('Práctica')}</option>
+            <option value="streak">{t('Aleatorio (racha)')}</option>
+          </select>
+        </TopBarSlot>
+      )}
+      {!mobile && !course && (
         <div className="segmented open-modes">
           <button className={mode === 'courses' ? 'active' : ''} onClick={() => switchMode('courses')}>
             <GraduationCap size={16} /> {t('Aperturas')}
@@ -232,23 +243,10 @@ function CourseView({
     return after.find((l) => !progress[lineKey(l)]?.learned) ?? after[0];
   };
   const label = (l: CourseLine) => `${progress[lineKey(l)]?.learned ? '✓ ' : ''}${l.trap ? '⚠ ' : ''}${tr(l.name)}`;
+  const mobile = useIsMobile();
 
-  return (
-    <div className="course-view">
-      <div className="course-head">
-        <button className="btn ghost small" onClick={onBack}>
-          <ArrowLeft size={16} /> {t('Aperturas')}
-        </button>
-        <div className="course-title">
-          <span className={`piece-dot ${line.side}`} />
-          <h2>{tr(course.name)}</h2>
-          <span className="muted">
-            {t('{n} de {total} aprendidas', { n: done, total: course.lines.length })}
-          </span>
-        </div>
-        <label className="variant-select">
-          <span className="muted">{t('Variante')}</span>
-          <select value={line.id} onChange={(e) => onLine(e.target.value)}>
+  const selectEl = (
+          <select value={line.id} onChange={(e) => onLine(e.target.value)} aria-label={t('Variante')}>
             {extra.length ? (
               <>
                 <optgroup label={course.guided ? t('Curso') : t('Variantes')}>
@@ -282,10 +280,48 @@ function CourseView({
               ))
             )}
           </select>
-        </label>
+  );
+
+  const mobileHead = (
+    <>
+      <div className="m-info m-course-head">
+        <button className="icon-btn" onClick={onBack} aria-label={t('Aperturas')} title={t('Aperturas')}>
+          <ArrowLeft size={18} />
+        </button>
+        <span className={`piece-dot ${line.side}`} />
+        <b className="m-ch-name">{tr(course.name)}</b>
+        <span className="spacer" />
+        <span className="m-chip mono" title={t('{n} de {total} aprendidas', { n: done, total: course.lines.length })}>
+          {done}/{course.lines.length}
+        </span>
       </div>
+      <div className="m-variant">{selectEl}</div>
+    </>
+  );
+
+  return (
+    <div className="course-view">
+      {!mobile && (
+        <div className="course-head">
+          <button className="btn ghost small" onClick={onBack}>
+            <ArrowLeft size={16} /> {t('Aperturas')}
+          </button>
+          <div className="course-title">
+            <span className={`piece-dot ${line.side}`} />
+            <h2>{tr(course.name)}</h2>
+            <span className="muted">
+              {t('{n} de {total} aprendidas', { n: done, total: course.lines.length })}
+            </span>
+          </div>
+          <label className="variant-select">
+            <span className="muted">{t('Variante')}</span>
+            {selectEl}
+          </label>
+        </div>
+      )}
 
       <Drill
+        header={mobile ? mobileHead : undefined}
         key={lineKey(line)}
         line={line}
         mode="learn"
@@ -345,21 +381,74 @@ function Drill({
     if (el) el.scrollTop = el.scrollHeight;
   }, [d.log.length]);
   const pct = d.total ? (d.ply / d.total) * 100 : 0;
+  const mobile = useIsMobile();
+
+  const boardEl = (
+    <Board
+      id="course-board"
+      fen={d.fen}
+      orientation={line.side}
+      lastMove={d.lastMove}
+      badge={d.badge}
+      arrows={d.hintArrow ? [{ ...d.hintArrow, color: hexA(look.bestArrow, 0.9) }] : []}
+      onMove={d.status === 'play' ? d.onMove : undefined}
+      premove
+    />
+  );
+  const logEl = (
+    <div className={`ct-log ${mobile ? 'm-ct-log' : ''}`} ref={logRef}>
+      {d.log.map((m) => (
+        <div key={m.id} className={`cm ${m.kind}`}>
+          {m.kind === 'ok' && <Check size={16} className="cm-ico" />}
+          {(m.kind === 'bad' || m.kind === 'fail') && <X size={16} className="cm-ico" />}
+          {m.kind === 'reply' && <span className={`piece-dot small ${line.side === 'white' ? 'black' : 'white'}`} />}
+          {m.kind === 'prompt' && <Play size={14} className="cm-ico" />}
+          <div className="cm-body">
+            {m.san && <b className="mono cm-san">{m.san} </b>}
+            {m.text.split('\n\n').map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+  const actionsEl = (
+    <>
+      {d.status === 'play' && (
+        <button className="btn" onClick={d.showHint} disabled={!!d.hintArrow}>
+          <Lightbulb size={16} /> {t('Pista')}
+        </button>
+      )}
+      {actions(d.status)}
+    </>
+  );
+
+  if (mobile) {
+    // Phone: course header and coach on top, the board as big as fits, buttons below.
+    return (
+      <MScreen className="m-drill">
+        {header}
+        <div className="m-ct">
+          <div className="cc-bar thin">
+            <i style={{ width: `${pct}%` }} />
+          </div>
+          {d.errors > 0 && (
+            <span className="ct-errors m-ct-errors" title={t('Errores')}>
+              <X size={13} /> {d.errors}
+            </span>
+          )}
+          {logEl}
+        </div>
+        <FitBoard>{boardEl}</FitBoard>
+        <div className="m-actions">{actionsEl}</div>
+      </MScreen>
+    );
+  }
 
   return (
     <div className="train-layout">
-      <section className="board-col">
-        <Board
-          id="course-board"
-          fen={d.fen}
-          orientation={line.side}
-          lastMove={d.lastMove}
-          badge={d.badge}
-          arrows={d.hintArrow ? [{ ...d.hintArrow, color: hexA(look.bestArrow, 0.9) }] : []}
-          onMove={d.status === 'play' ? d.onMove : undefined}
-          premove
-        />
-      </section>
+      <section className="board-col">{boardEl}</section>
       <aside className="panel ct-panel">
         {header}
         <div className="card ctc">
@@ -380,30 +469,8 @@ function Drill({
           <div className="cc-bar thin">
             <i style={{ width: `${pct}%` }} />
           </div>
-          <div className="ct-log" ref={logRef}>
-            {d.log.map((m) => (
-              <div key={m.id} className={`cm ${m.kind}`}>
-                {m.kind === 'ok' && <Check size={16} className="cm-ico" />}
-                {(m.kind === 'bad' || m.kind === 'fail') && <X size={16} className="cm-ico" />}
-                {m.kind === 'reply' && <span className={`piece-dot small ${line.side === 'white' ? 'black' : 'white'}`} />}
-                {m.kind === 'prompt' && <Play size={14} className="cm-ico" />}
-                <div className="cm-body">
-                  {m.san && <b className="mono cm-san">{m.san} </b>}
-                  {m.text.split('\n\n').map((p, i) => (
-                    <p key={i}>{p}</p>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="puzzle-actions">
-            {d.status === 'play' && (
-              <button className="btn" onClick={d.showHint} disabled={!!d.hintArrow}>
-                <Lightbulb size={16} /> {t('Pista')}
-              </button>
-            )}
-            {actions(d.status)}
-          </div>
+          {logEl}
+          <div className="puzzle-actions">{actionsEl}</div>
         </div>
       </aside>
     </div>

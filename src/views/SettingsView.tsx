@@ -687,8 +687,23 @@ function EngineTab({
         <Row label={t('Flecha con la mejor jugada (revisión)')}>
           <Toggle checked={settings.showBestArrow} onChange={(v) => set('showBestArrow', v)} />
         </Row>
-        <Row label={t('Flecha del motor en vivo')}>
-          <Toggle checked={settings.showLiveArrow} onChange={(v) => set('showLiveArrow', v)} />
+        <Row
+          label={t('Flechas de jugadas recomendadas')}
+          hint={t('Las mejores jugadas del motor, cada flecha con el color de su clasificación (brillante, mejor, excelente…).')}
+        >
+          <select
+            value={settings.liveArrows}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              patch({ liveArrows: n, liveLines: Math.max(settings.liveLines, n) });
+            }}
+          >
+            {[0, 1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                {n === 0 ? t('Ninguna') : n}
+              </option>
+            ))}
+          </select>
         </Row>
       </section>
     </>

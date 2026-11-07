@@ -3,6 +3,7 @@ import { Check, Flag, Loader2, Play, Timer, Trophy, X, Zap } from 'lucide-react'
 import { Board } from '../../components/Board';
 import { loadPuzzles, loadRush, pickPuzzle, RUSH_MODES, rushTarget, saveRushRun, type Puzzle, type RushMode } from '../../lib/puzzles';
 import { usePuzzleGame } from '../../lib/usePuzzleGame';
+import { FitBoard, MScreen, useIsMobile } from '../../components/mobile';
 
 import { t } from '../../i18n';
 
@@ -22,6 +23,7 @@ export function RushTab() {
   const [now, setNow] = useState(Date.now());
   const [newBest, setNewBest] = useState(false);
   const used = useRef(new Set<string>());
+  const mobile = useIsMobile();
   const def = RUSH_MODES.find((m) => m.id === mode)!;
 
   useEffect(() => {
@@ -104,7 +106,7 @@ export function RushTab() {
 
   if (phase === 'menu' || phase === 'over') {
     return (
-      <div className="rush-menu">
+      <div className={`rush-menu ${mobile ? 'm-pad' : ''}`}>
         {phase === 'over' && (
           <section className="card rush-result">
             <div className="rush-score">
@@ -157,22 +159,73 @@ export function RushTab() {
   const mm = Math.floor(left / 60000);
   const ss = Math.floor((left % 60000) / 1000);
 
+  const sideName = game.solverColor === 'white' ? t('Blancas') : t('Negras');
+  const boardEl = (
+    <Board
+      id="rush-board"
+      fen={game.fen}
+      orientation={game.solverColor}
+      lastMove={game.lastMove}
+      badge={game.badge}
+      onMove={game.status === 'play' ? game.onMove : undefined}
+      premove
+    />
+  );
+  const livesEl = (
+    <div className="rush-lives">
+      {Array.from({ length: def.lives }, (_, i) => (
+        <span key={i} className={i < strikes ? 'lost' : ''}>
+          <X size={16} />
+        </span>
+      ))}
+    </div>
+  );
+  const attemptsEl = (
+    <div className="rush-list">
+      {results.map((r, i) => (
+        <span key={i} className={`attempt ${r.ok ? 'ok' : 'ko'}`}>
+          {r.ok ? <Check size={12} /> : <X size={12} />}
+        </span>
+      ))}
+    </div>
+  );
+
+  if (mobile) {
+    return (
+      <MScreen className="m-rush">
+        <div className="m-info">
+          <span className="m-turn">
+            <span className={`piece-dot ${game.solverColor}`} />
+            {game.status === 'intro' ? '…' : sideName}
+          </span>
+          <span className="spacer" />
+          <span className={`m-chip mono rush-clock-chip ${endAt && left < 15000 ? 'low' : ''}`}>
+            {endAt ? `${mm}:${String(ss).padStart(2, '0')}` : def.label}
+          </span>
+          <span className="m-chip mono">
+            <Zap size={15} /> {score}
+          </span>
+          {livesEl}
+        </div>
+        <div className="m-attempts">{attemptsEl}</div>
+        <FitBoard>{boardEl}</FitBoard>
+        <div className="m-actions">
+          <button className="btn ghost" onClick={() => finish(results)}>
+            <Flag size={16} />{' '}{t('Rendirse')}
+          </button>
+        </div>
+      </MScreen>
+    );
+  }
+
   return (
     <div className="train-layout">
       <section className="board-col">
         <div className="train-turn">
           <span className={`piece-dot ${game.solverColor}`} />
-          {game.status === 'intro' ? '…' : `Juegan ${game.solverColor === 'white' ? 'blancas' : 'negras'}`}
+          {game.status === 'intro' ? '…' : t('Juegan {side}', { side: sideName.toLowerCase() })}
         </div>
-        <Board
-          id="rush-board"
-          fen={game.fen}
-          orientation={game.solverColor}
-          lastMove={game.lastMove}
-          badge={game.badge}
-          onMove={game.status === 'play' ? game.onMove : undefined}
-          premove
-        />
+        {boardEl}
       </section>
       <aside className="panel">
         <div className="card rush-hud">
@@ -187,20 +240,8 @@ export function RushTab() {
             <Zap size={22} />
             <b>{score}</b>
           </div>
-          <div className="rush-lives">
-            {Array.from({ length: def.lives }, (_, i) => (
-              <span key={i} className={i < strikes ? 'lost' : ''}>
-                <X size={16} />
-              </span>
-            ))}
-          </div>
-          <div className="rush-list">
-            {results.map((r, i) => (
-              <span key={i} className={`attempt ${r.ok ? 'ok' : 'ko'}`}>
-                {r.ok ? <Check size={12} /> : <X size={12} />}
-              </span>
-            ))}
-          </div>
+          {livesEl}
+          {attemptsEl}
           <button className="btn small ghost" onClick={() => finish(results)}>
             <Flag size={14} />{' '}{t('Rendirse')}
           </button>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ChevronDown, Eye, Flame, HelpCircle, Lightbulb, Loader2, RotateCcw } from 'lucide-react';
+import { ArrowRight, BarChart3, ChevronDown, Eye, Flame, HelpCircle, Lightbulb, Loader2, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { FitBoard, MScreen, Sheet, useIsMobile } from '../../components/mobile';
 import { Board } from '../../components/Board';
 import { useLook } from '../../lib/look';
 import { hexA } from '../../lib/appearance';
@@ -35,6 +36,8 @@ export function PuzzlesTab() {
   const [result, setResult] = useState<{ ok: boolean; delta: number } | null>(null);
   const [help, setHelp] = useState(() => !localStorage.getItem('dc:puzzle-help-seen'));
   const look = useLook();
+  const mobile = useIsMobile();
+  const [sheet, setSheet] = useState<'options' | 'stats' | 'help' | null>(null);
 
   useEffect(() => {
     loadPuzzles().then(setAll);
@@ -108,21 +111,195 @@ export function PuzzlesTab() {
         : t('Encuentra la mejor jugada. Puede haber varias jugadas seguidas.');
   }
 
+  const boardEl = (
+    <Board
+      id="puzzle-board"
+      fen={game.fen}
+      orientation={game.solverColor}
+      lastMove={game.lastMove}
+      badge={game.badge}
+      arrows={game.hintMove ? [{ ...game.hintMove, color: hexA(look.bestArrow, 0.9) }] : []}
+      highlights={game.hintSquare ? { [game.hintSquare]: hexA(look.highlight, 0.75) } : undefined}
+      onMove={game.status === 'play' ? game.onMove : undefined}
+      premove
+    />
+  );
+
+  const actionsEl = !done ? (
+    <>
+      <button className="btn" onClick={game.hint} disabled={game.status !== 'play' || !!game.hintMove}>
+        <Lightbulb size={16} /> {t('Pista')}
+      </button>
+      <button className="btn" onClick={game.showSolution}>
+        <Eye size={16} /> {t('Solución')}
+      </button>
+      <button className="btn ghost" onClick={() => next()}>
+        {t('Saltar')} <ArrowRight size={16} />
+      </button>
+    </>
+  ) : (
+    <>
+      <button className="btn" onClick={game.retry}>
+        <RotateCcw size={16} /> {t('Repetir')}
+      </button>
+      <button className="btn primary" onClick={() => next()}>
+        {t('Siguiente')} <ArrowRight size={16} />
+      </button>
+    </>
+  );
+
+  const helpEl = (
+    <ol>
+      <li>{t('El rival mueve primero. Después te toca a ti: busca la mejor jugada (casi siempre gana material o da mate).')}</li>
+      <li>{t('Si aciertas, el rival responde y sigues hasta terminar. Si fallas, puedes volver a intentarlo.')}</li>
+      <li>{t('Tu nivel sube cuando aciertas a la primera y baja si fallas, pides pista o ves la solución. Los problemas se adaptan a tu nivel.')}</li>
+      <li>{t('La racha cuenta cuántos problemas seguidos llevas sin fallar.')}</li>
+    </ol>
+  );
+  const closeHelp = () => {
+    setHelp(false);
+    localStorage.setItem('dc:puzzle-help-seen', '1');
+  };
+
+  const optionsEl = (
+    <>
+      <div className="setting-row">
+        <span className="setting-label">{t('Tema')}</span>
+        <select
+          value={theme}
+          onChange={(e) => {
+            setTheme(e.target.value);
+            localStorage.setItem('dc:puzzle-theme', e.target.value);
+          }}
+        >
+          {THEMES.map((x) => (
+            <option key={x.id} value={x.id}>
+              {t(x.label)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="setting-row">
+        <span className="setting-label">{t('Dificultad')}</span>
+        <select
+          value={offset}
+          onChange={(e) => {
+            setOffset(Number(e.target.value));
+            localStorage.setItem('dc:puzzle-offset', e.target.value);
+          }}
+        >
+          {DIFFICULTY.map(([v, l]) => (
+            <option key={v} value={v}>
+              {t(l)}
+            </option>
+          ))}
+        </select>
+      </div>
+    </>
+  );
+
+  const statsEl = (
+    <>
+      <div className="stat-grid">
+        <span>
+          {t('Resueltos')} <b>{stats.solved}</b>
+        </span>
+        <span>
+          {t('Fallados')} <b>{stats.failed}</b>
+        </span>
+        <span>
+          {t('Acierto')} <b>{accuracy}%</b>
+        </span>
+        <span>
+          {t('Mejor racha')} <b>{stats.bestStreak}</b>
+        </span>
+        <span>
+          {t('Nivel máximo')} <b>{stats.peak}</b>
+        </span>
+      </div>
+      {ratingSeries.length > 1 && <Sparkline values={ratingSeries} />}
+      <p className="fine-print">{t('{n} problemas de la base de datos libre de Lichess.', { n: all.length.toLocaleString() })}</p>
+      <button
+        className="btn small ghost"
+        onClick={() => {
+          if (!confirm(t('¿Reiniciar tu nivel de problemas a 1200?'))) return;
+          const ns = { ...loadStats(), rating: 1200, peak: 1200, games: 0, solved: 0, failed: 0, streak: 0, bestStreak: 0, history: [] };
+          saveStats(ns);
+          setStats(ns);
+        }}
+      >
+        <RotateCcw size={14} /> {t('Reiniciar nivel')}
+      </button>
+    </>
+  );
+
+  const deltaEl = result && (
+    <span className={`pr-delta ${result.ok ? 'up' : 'down'}`}>
+      {result.delta > 0 ? '+' : ''}
+      {result.delta}
+    </span>
+  );
+
+  if (mobile) {
+    // Phone: who moves + level + streak + menus on top, the board as big as fits, buttons below.
+    const status = game.status === 'play' ? sub : headline;
+    return (
+      <MScreen className="m-puzzles">
+        <div className="m-info">
+          <span className="m-turn">
+            <span className={`piece-dot ${game.solverColor}`} />
+            {game.solverColor === 'white' ? t('Blancas') : t('Negras')}
+          </span>
+          <span className="spacer" />
+          <span className="m-chip mono" title={t('Tu nivel')}>
+            {stats.rating}
+            {deltaEl}
+          </span>
+          <span className="m-chip mono" title={t('Racha')}>
+            <Flame size={15} className="flame" /> {stats.streak}
+          </span>
+          <button className="icon-btn" onClick={() => setSheet('options')} aria-label={t('Opciones')} title={t('Opciones')}>
+            <SlidersHorizontal size={18} />
+          </button>
+          <button className="icon-btn" onClick={() => setSheet('stats')} aria-label={t('Estadísticas')} title={t('Estadísticas')}>
+            <BarChart3 size={18} />
+          </button>
+          <button className="icon-btn" onClick={() => setSheet('help')} aria-label={t('¿Cómo funciona?')} title={t('¿Cómo funciona?')}>
+            <HelpCircle size={18} />
+          </button>
+        </div>
+        <div className={`m-status ${tone}`}>{status}</div>
+        {done && puzzle && (
+          <div className="m-status small">
+            {t('Problema de nivel {r}', { r: puzzle.rating })}
+          </div>
+        )}
+        <FitBoard>{boardEl}</FitBoard>
+        <div className="m-actions">{actionsEl}</div>
+
+        <Sheet open={sheet === 'options'} title={t('Opciones')} onClose={() => setSheet(null)}>
+          {optionsEl}
+        </Sheet>
+        <Sheet open={sheet === 'stats'} title={t('Estadísticas')} onClose={() => setSheet(null)}>
+          {statsEl}
+        </Sheet>
+        <Sheet
+          open={sheet === 'help' || help}
+          title={t('¿Cómo funciona?')}
+          onClose={() => {
+            setSheet(null);
+            closeHelp();
+          }}
+        >
+          <div className="help-card">{helpEl}</div>
+        </Sheet>
+      </MScreen>
+    );
+  }
+
   return (
     <div className="train-layout">
-      <section className="board-col">
-        <Board
-          id="puzzle-board"
-          fen={game.fen}
-          orientation={game.solverColor}
-          lastMove={game.lastMove}
-          badge={game.badge}
-          arrows={game.hintMove ? [{ ...game.hintMove, color: hexA(look.bestArrow, 0.9) }] : []}
-          highlights={game.hintSquare ? { [game.hintSquare]: hexA(look.highlight, 0.75) } : undefined}
-          onMove={game.status === 'play' ? game.onMove : undefined}
-          premove
-        />
-      </section>
+      <section className="board-col">{boardEl}</section>
 
       <aside className="panel">
         <div className={`card puzzle-status ${tone}`}>
@@ -145,42 +322,14 @@ export function PuzzlesTab() {
                   .join(', ')}`}
             </div>
           )}
-          <div className="puzzle-actions">
-            {!done ? (
-              <>
-                <button className="btn" onClick={game.hint} disabled={game.status !== 'play' || !!game.hintMove}>
-                  <Lightbulb size={16} /> {t('Pista')}
-                </button>
-                <button className="btn" onClick={game.showSolution}>
-                  <Eye size={16} /> {t('Solución')}
-                </button>
-                <button className="btn ghost" onClick={() => next()}>
-                  {t('Saltar')} <ArrowRight size={16} />
-                </button>
-              </>
-            ) : (
-              <>
-                <button className="btn" onClick={game.retry}>
-                  <RotateCcw size={16} /> {t('Repetir')}
-                </button>
-                <button className="btn primary" onClick={() => next()}>
-                  {t('Siguiente')} <ArrowRight size={16} />
-                </button>
-              </>
-            )}
-          </div>
+          <div className="puzzle-actions">{actionsEl}</div>
         </div>
 
         <div className="card puzzle-level">
           <div className="pl-item">
             <span className="muted">{t('Tu nivel')}</span>
             <b className="mono">{stats.rating}</b>
-            {result && (
-              <span className={`pr-delta ${result.ok ? 'up' : 'down'}`}>
-                {result.delta > 0 ? '+' : ''}
-                {result.delta}
-              </span>
-            )}
+            {deltaEl}
           </div>
           <div className="pl-item">
             <span className="muted">{t('Racha')}</span>
@@ -196,19 +345,8 @@ export function PuzzlesTab() {
         {help && (
           <div className="card help-card">
             <h3 className="card-title">{t('¿Cómo funciona?')}</h3>
-            <ol>
-              <li>{t('El rival mueve primero. Después te toca a ti: busca la mejor jugada (casi siempre gana material o da mate).')}</li>
-              <li>{t('Si aciertas, el rival responde y sigues hasta terminar. Si fallas, puedes volver a intentarlo.')}</li>
-              <li>{t('Tu nivel sube cuando aciertas a la primera y baja si fallas, pides pista o ves la solución. Los problemas se adaptan a tu nivel.')}</li>
-              <li>{t('La racha cuenta cuántos problemas seguidos llevas sin fallar.')}</li>
-            </ol>
-            <button
-              className="btn small"
-              onClick={() => {
-                setHelp(false);
-                localStorage.setItem('dc:puzzle-help-seen', '1');
-              }}
-            >
+            {helpEl}
+            <button className="btn small" onClick={closeHelp}>
               {t('Entendido')}
             </button>
           </div>
@@ -218,68 +356,8 @@ export function PuzzlesTab() {
           <summary>
             {t('Opciones y estadísticas')} <ChevronDown size={16} />
           </summary>
-          <div className="setting-row">
-            <span className="setting-label">{t('Tema')}</span>
-            <select
-              value={theme}
-              onChange={(e) => {
-                setTheme(e.target.value);
-                localStorage.setItem('dc:puzzle-theme', e.target.value);
-              }}
-            >
-              {THEMES.map((x) => (
-                <option key={x.id} value={x.id}>
-                  {t(x.label)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="setting-row">
-            <span className="setting-label">{t('Dificultad')}</span>
-            <select
-              value={offset}
-              onChange={(e) => {
-                setOffset(Number(e.target.value));
-                localStorage.setItem('dc:puzzle-offset', e.target.value);
-              }}
-            >
-              {DIFFICULTY.map(([v, l]) => (
-                <option key={v} value={v}>
-                  {t(l)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="stat-grid">
-            <span>
-              {t('Resueltos')} <b>{stats.solved}</b>
-            </span>
-            <span>
-              {t('Fallados')} <b>{stats.failed}</b>
-            </span>
-            <span>
-              {t('Acierto')} <b>{accuracy}%</b>
-            </span>
-            <span>
-              {t('Mejor racha')} <b>{stats.bestStreak}</b>
-            </span>
-            <span>
-              {t('Nivel máximo')} <b>{stats.peak}</b>
-            </span>
-          </div>
-          {ratingSeries.length > 1 && <Sparkline values={ratingSeries} />}
-          <p className="fine-print">{t('{n} problemas de la base de datos libre de Lichess.', { n: all.length.toLocaleString() })}</p>
-          <button
-            className="btn small ghost"
-            onClick={() => {
-              if (!confirm(t('¿Reiniciar tu nivel de problemas a 1200?'))) return;
-              const ns = { ...loadStats(), rating: 1200, peak: 1200, games: 0, solved: 0, failed: 0, streak: 0, bestStreak: 0, history: [] };
-              saveStats(ns);
-              setStats(ns);
-            }}
-          >
-            <RotateCcw size={14} /> {t('Reiniciar nivel')}
-          </button>
+          {optionsEl}
+          {statsEl}
         </details>
       </aside>
     </div>

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { formatEval, numberedLine } from '../lib/chess';
 import { ENGINES, type EngineId } from '../engine/stockfish';
-import type { EngineLineView, Settings } from '../lib/types';
+import type { Classification, EngineLineView, Settings } from '../lib/types';
+import { CLASS_META } from './ClassIcon';
 import { t } from '../i18n';
 
 export const TIME_OPTIONS = [0, 3, 5, 10, 15, 20, 30];
@@ -20,6 +21,8 @@ interface Props {
   settings: Settings;
   onSettings: (s: Settings) => void;
   onPlayLine: (uci: string[]) => void;
+  /** Classification of each line (colours the arrows / dots). */
+  classes?: Classification[];
 }
 
 export function EngineLines(p: Props) {
@@ -82,6 +85,18 @@ export function EngineLines(p: Props) {
             ))}
           </select>
         </label>
+        <div className="seg-mini" role="group" aria-label={t('Flechas')}>
+          <span className="opt-label">{t('Flechas')}</span>
+          {[0, 1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              className={settings.liveArrows === n ? 'active' : ''}
+              onClick={() => onSettings({ ...settings, liveArrows: n, liveLines: Math.max(settings.liveLines, n) })}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
         {p.threads > 1 && <span className="opt-label">{p.threads}{' '}{t('hilos')}</span>}
       </div>
 
@@ -100,6 +115,9 @@ export function EngineLines(p: Props) {
           ) : (
             lines.map((l, i) => (
               <button key={i} className="engine-line" onClick={() => p.onPlayLine(l.uci)} title={t('Jugar esta línea')}>
+                {p.classes?.[i] && i < settings.liveArrows && (
+                  <span className="line-dot" style={{ background: CLASS_META[p.classes[i]].color }} title={CLASS_META[p.classes[i]].label} />
+                )}
                 <span className={`eval-chip ${evalSide(l.eval)}`}>{formatEval(l.eval)}</span>
                 <span className="mono line-text">{numberedLine(fen, l.san.slice(0, 10))}</span>
               </button>

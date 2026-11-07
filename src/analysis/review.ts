@@ -153,6 +153,39 @@ function classifyMove(args: {
   return { classification: 'blunder', loss, accuracy };
 }
 
+/**
+ * Classifies the engine's candidate moves of a position as if they were played (the best one is
+ * "best", or "great"/"brilliant" when it is the only good move or a sound sacrifice; the others by
+ * how much they lose). Used to colour the suggestion arrows.
+ */
+export function classifyCandidates(fen: string, lines: EngineLineView[]): Classification[] {
+  if (!lines.length) return [];
+  const color = fen.split(' ')[1] === 'b' ? 'b' : 'w';
+  const wb = moverWin(lines[0].eval, color);
+  const gap = lines.length > 1 ? wb - moverWin(lines[1].eval, color) : 0;
+  return lines.map((l, i) => {
+    const wa = moverWin(l.eval, color);
+    const loss = Math.max(0, wb - wa);
+    if (loss <= 2) {
+      let move: Move | null = null;
+      try {
+        const u = l.uci[0];
+        move = new Chess(fen).move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
+      } catch {
+        /* ignore */
+      }
+      if (move && wa >= 45 && wb < 97 && isSacrifice(move)) return 'brilliant';
+      if (i === 0 && gap >= 15 && wb < 95 && wb > 8) return 'great';
+      if (i === 0 || loss < 0.5) return 'best';
+      return 'excellent';
+    }
+    if (loss <= 5) return 'good';
+    if (loss <= 10) return 'inaccuracy';
+    if (loss <= 20) return 'mistake';
+    return 'blunder';
+  });
+}
+
 // ---------- Game accuracy (Lichess-style volatility-weighted mean + harmonic mean) ----------
 
 function stdDev(xs: number[]) {

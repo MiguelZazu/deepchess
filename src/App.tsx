@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { GraduationCap, Home, Microscope, Puzzle, Settings as SettingsIcon, Users } from 'lucide-react';
+import { GraduationCap, Home, Menu, Microscope, Puzzle, Settings as SettingsIcon, Users, Zap } from 'lucide-react';
+import { useIsMobile } from './components/mobile';
 import { HomeView } from './views/HomeView';
 import { GamesView } from './views/GamesView';
 import { AnalysisView } from './views/AnalysisView';
@@ -55,6 +56,8 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [current, setCurrent] = useState(loadCurrentGame);
   const engine = useEngineState();
+  const mobile = useIsMobile();
+  const [menuOpen, setMenuOpen] = useState(false);
   // The language is global; setting it during render makes every child use it immediately.
   setLang(settings.language);
 
@@ -73,6 +76,7 @@ export default function App() {
 
   const navigate = (r: Route) => {
     const h = toHash(r);
+    setMenuOpen(false);
     if (location.hash !== h) location.hash = h;
     else setRoute(r);
     window.scrollTo({ top: 0 });
@@ -121,15 +125,68 @@ export default function App() {
       get label() { return t('Problemas'); },
       icon: Puzzle,
       onClick: () => navigate({ name: 'train', tab: route.name === 'train' ? route.tab : 'puzzles' }),
-      active: route.name === 'train',
+      active: route.name === 'train' && (!mobile || route.tab === 'puzzles'),
+    },
+    {
+      id: 'rush',
+      mobileOnly: true,
+      get label() { return t('Contrarreloj'); },
+      icon: Zap,
+      onClick: () => navigate({ name: 'train', tab: 'rush' }),
+      active: route.name === 'train' && route.tab === 'rush',
     },
     { id: 'openings', get label() { return t('Aperturas'); }, icon: GraduationCap, onClick: () => navigate({ name: 'openings' }), active: route.name === 'openings' },
     { id: 'settings', get label() { return t('Ajustes'); }, icon: SettingsIcon, onClick: () => navigate({ name: 'settings' }), active: route.name === 'settings' },
   ];
 
+  const desktopNav = nav.filter((n) => !('mobileOnly' in n));
+  const title = nav.find((n) => n.active)?.label ?? 'DeepChess';
+
   return (
     <LookProvider appearance={settings.appearance}>
     <div className="app">
+      {mobile && (
+        <header className="m-topbar">
+          <button className="icon-btn m-burger" onClick={() => setMenuOpen(!menuOpen)} aria-label={t('Menú')} aria-expanded={menuOpen}>
+            <Menu size={22} />
+          </button>
+          <span className="m-title">{title}</span>
+          <div id="m-topbar-slot" className="m-topbar-slot" />
+        </header>
+      )}
+      {mobile && menuOpen && (
+        <div className="m-menu-backdrop" onClick={() => setMenuOpen(false)}>
+          <nav className="m-menu" aria-label={t('Principal')} onClick={(e) => e.stopPropagation()}>
+            <div className="m-menu-brand">
+              <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={28} height={28} />
+              <span className="brand-name">
+                {t('Deep')}<b>{t('Chess')}</b>
+              </span>
+            </div>
+            {nav.map((n) => (
+              <button key={n.id} className={`nav-item ${n.active ? 'active' : ''}`} onClick={n.onClick}>
+                <n.icon size={20} />
+                <span>{n.label}</span>
+              </button>
+            ))}
+            {accounts.length > 0 && <div className="nav-section">{t('Cuentas')}</div>}
+            {accounts.map((a) => (
+              <button
+                key={`${a.platform}:${a.username}`}
+                className="nav-account"
+                onClick={() => navigate({ name: 'games', platform: a.platform, username: a.username })}
+              >
+                <span className={`pf ${a.platform}`} />
+                {a.username}
+              </button>
+            ))}
+            <div className="engine-status">
+              <span className={`dot ${engine.status === 'ready' ? 'ok' : engine.status === 'error' ? 'err' : ''}`} />
+              {engine.name}
+            </div>
+          </nav>
+        </div>
+      )}
       <nav className="sidebar" aria-label={t('Principal')}>
         <button className="brand" onClick={() => navigate({ name: 'home' })} aria-label={t('DeepChess inicio')}>
           <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={34} height={34} />
@@ -138,7 +195,7 @@ export default function App() {
           </span>
         </button>
         <div className="nav-items">
-          {nav.map((n) => (
+          {desktopNav.map((n) => (
             <button key={n.id} className={`nav-item ${n.active ? 'active' : ''}`} onClick={n.onClick}>
               <n.icon size={20} />
               <span>{n.label}</span>
@@ -192,21 +249,13 @@ export default function App() {
         )}
         {route.name === 'train' && <TrainView tab={route.tab} onTab={(tab) => navigate({ name: 'train', tab })} />}
         {route.name === 'openings' && (
-          <div className="page train">
+          <div className={mobile ? 'm-page' : 'page train'}>
             <OpeningsTab />
           </div>
         )}
         {route.name === 'settings' && <SettingsView settings={settings} onChange={updateSettings} />}
       </main>
 
-      <nav className="bottom-nav" aria-label={t('Principal móvil')}>
-        {nav.map((n) => (
-          <button key={n.id} className={n.active ? 'active' : ''} onClick={n.onClick}>
-            <n.icon size={22} />
-            <span>{n.label}</span>
-          </button>
-        ))}
-      </nav>
     </div>
     </LookProvider>
   );

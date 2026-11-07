@@ -33,7 +33,7 @@ function writeLS(key: string, value: unknown) {
 
 // ---------- Settings ----------
 /** Bump when defaults change in a way existing users should get too (see loadSettings). */
-const SETTINGS_REV = 2;
+const SETTINGS_REV = 3;
 export const DEFAULT_SETTINGS: Settings = {
   language: detectLang(),
   engine: 'sf19-lite',
@@ -47,6 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
   liveEngine: true,
   showBestArrow: true,
   showLiveArrow: true,
+  liveArrows: 3,
   appearance: DEFAULT_APPEARANCE,
   sound: DEFAULT_SOUND,
   settingsRev: SETTINGS_REV,
@@ -64,6 +65,10 @@ export function loadSettings(): Settings {
     // v2: chess.com-like analysis (quick review, live depth 20 with 3 lines) and recorded move sounds.
     Object.assign(out, { engine: 'sf19-lite', reviewDepth: 12, reviewMaxTime: 0, liveDepth: 20, liveLines: 3, liveMaxTime: 0 });
     if (sound.pack === 'wood' || sound.pack === 'soft') sound.pack = 'board';
+  }
+  if ((raw.settingsRev ?? 0) < 3 && Object.keys(raw).length > 0) {
+    // v3: the single live arrow became N arrows for the top moves.
+    out.liveArrows = raw.showLiveArrow === false ? 0 : 3;
   }
   out.settingsRev = SETTINGS_REV;
   return out;

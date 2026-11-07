@@ -10,15 +10,16 @@ interface Props {
   moves?: MoveReview[];
   ply: number;
   onSelect: (ply: number) => void;
+  height?: number;
 }
 
 const MARKED = new Set(['brilliant', 'great', 'miss', 'mistake', 'blunder']);
 
-export function EvalGraph({ positions, total, moves, ply, onSelect }: Props) {
+export function EvalGraph({ positions, total, moves, ply, onSelect, height = 96 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(360);
   const [hover, setHover] = useState<number | null>(null);
-  const h = 96;
+  const h = height;
 
   useEffect(() => {
     const el = ref.current;
