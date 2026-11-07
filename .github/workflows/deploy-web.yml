@@ -31,6 +31,10 @@ jobs:
           if [[ "$REPO" == *.github.io ]]; then export BASE=/; else export BASE="/$REPO/"; fi
           npm run build
           cp dist/index.html dist/404.html
+          # GitHub Pages can't send the COOP/COEP headers that multi-threaded WASM needs, so the
+          # app always loads the single-threaded engines there: drop the threaded builds (~100 MB).
+          rm -f dist/engine/stockfish-19.js dist/engine/stockfish-19.wasm dist/engine/stockfish-19-lite.js dist/engine/stockfish-19-lite.wasm
+          du -sh dist
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -44,3 +48,5 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 1800000
