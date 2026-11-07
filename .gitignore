@@ -1,0 +1,21 @@
+node_modules
+dist
+release
+public/engine
+android/app/build
+android/build
+android/.gradle
+android/local.properties
+android/app/src/main/assets/public
+*.log
+
+# Signing keys: NEVER commit them
+*.jks
+*.keystore
+android/keystore.properties
+.env
+.env.*
+
+# Local tooling / build caches
+.claude
+*.tsbuildinfo

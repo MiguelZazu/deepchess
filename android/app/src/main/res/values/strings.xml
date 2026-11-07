@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DeepChess</string>
+    <string name="title_activity_main">DeepChess</string>
+    <string name="package_name">com.deepchess.app</string>
+    <string name="custom_url_scheme">com.deepchess.app</string>
+</resources>

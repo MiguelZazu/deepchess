@@ -1,0 +1,67 @@
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
+
+// Sub-path for hosting, e.g. BASE=/deepchess/ for https://user.github.io/deepchess/.
+const base = process.env.BASE ?? '/';
+
+// Content-Security-Policy: only our own code runs; network access is limited to the two chess APIs.
+const CSP = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: https:; connect-src 'self' https://api.chess.com https://lichess.org; object-src 'none'; base-uri 'self'; form-action 'none'";
+const csp = {
+  name: 'deepchess-csp',
+  apply: 'build' as const,
+  transformIndexHtml: (html: string) =>
+    html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
+};
+
+// Cross-origin isolation enables SharedArrayBuffer → multi-threaded Stockfish.
+// "credentialless" keeps third-party images (avatars) and fonts working.
+const isolation = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'credentialless',
+};
+
+export default defineConfig({
+  base,
+  server: { headers: isolation },
+  preview: { headers: isolation },
+  plugins: [
+    react(),
+    csp,
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['icon.svg'],
+      manifest: {
+        name: 'DeepChess — Análisis con Stockfish 19',
+        short_name: 'DeepChess',
+        description:
+          'Analiza tus partidas de Chess.com y Lichess con Stockfish 19 directamente en tu dispositivo.',
+        theme_color: '#0d1117',
+        background_color: '#0d1117',
+        display: 'standalone',
+        orientation: 'any',
+        start_url: base,
+        scope: base,
+        icons: [
+          { src: 'pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,svg,png,wasm,json}'],
+        // The full engine (~95 MB) is cached on first use instead of precached.
+        globIgnores: ['engine/stockfish-19.*', 'engine/stockfish-19-single.*'],
+        runtimeCaching: [
+          {
+            urlPattern: /\/engine\/stockfish-19(-single)?\.(js|wasm)$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'engine-full', expiration: { maxEntries: 4 } },
+          },
+        ],
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+      },
+    }),
+  ],
+});
