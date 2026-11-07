@@ -533,8 +533,8 @@ interface EnginePreset {
 }
 const ENGINE_PRESETS: EnginePreset[] = [
   {
-    id: 'chesscom',
-    get label() { return t('Como chess.com'); },
+    id: 'chesscom', // kept for saved settings
+    get label() { return t('Por defecto'); },
     get desc() { return t('Lite · revisión rápida (prof. 12) · vivo prof. 20, 3 líneas. Rápido también en móvil.'); },
     values: { engine: 'sf19-lite', reviewDepth: 12, reviewMaxTime: 0, liveDepth: 20, liveLines: 3, liveMaxTime: 0 },
   },
@@ -581,7 +581,6 @@ function EngineTab({
           {ENGINE_PRESETS.map((p) => (
             <button key={p.id} className={`engine-card ${activePreset === p.id ? 'active' : ''}`} onClick={() => applyPreset(p)}>
               <b>{p.label}</b>
-              {p.id === 'chesscom' && <span className="tag">{t('por defecto')}</span>}
               <p>{p.desc}</p>
             </button>
           ))}

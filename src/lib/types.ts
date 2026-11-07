@@ -179,7 +179,7 @@ export interface Appearance {
   assets: Partial<Record<AssetSlot, number>>; // uploaded image versions (timestamps)
 }
 
-export type SoundPack = 'board' | 'wood' | 'soft' | 'sfx' | 'piano' | 'nes' | 'futuristic' | 'custom';
+export type SoundPack = 'foley' | 'board' | 'wood' | 'soft' | 'sfx' | 'piano' | 'nes' | 'futuristic' | 'custom';
 export type CustomSoundSlot = 'move' | 'capture';
 export interface SoundSettings {
   enabled: boolean;

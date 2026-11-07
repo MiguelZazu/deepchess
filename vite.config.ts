@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -21,8 +22,13 @@ const isolation = {
   'Cross-Origin-Embedder-Policy': 'credentialless',
 };
 
+// The "Foley" move sounds are not in the public repository (third-party licence): they live in
+// the git-ignored public/sounds/foley/ folder locally and come from repository secrets in CI.
+const hasFoley = existsSync('public/sounds/foley/move.mp3') && existsSync('public/sounds/foley/capture.mp3');
+
 export default defineConfig({
   base,
+  define: { __HAS_FOLEY__: JSON.stringify(hasFoley) },
   server: { headers: isolation },
   preview: { headers: isolation },
   plugins: [

@@ -24,6 +24,22 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Default move sounds: third-party licence, so they live in repository secrets instead of
+      # the public repo. Without the secrets the build simply uses the other sound packs.
+      - name: Restore private sounds
+        shell: bash
+        env:
+          MOVE_B64: ${{ secrets.SOUND_FOLEY_MOVE_B64 }}
+          CAPTURE_B64: ${{ secrets.SOUND_FOLEY_CAPTURE_B64 }}
+        run: |
+          if [ -n "$MOVE_B64" ] && [ -n "$CAPTURE_B64" ]; then
+            mkdir -p public/sounds/foley
+            echo "$MOVE_B64" | base64 -d > public/sounds/foley/move.mp3
+            echo "$CAPTURE_B64" | base64 -d > public/sounds/foley/capture.mp3
+            echo "Foley sounds restored"
+          else
+            echo "Foley sound secrets not set; building without them"
+          fi
       # https://<user>.github.io/<repo>/ needs BASE=/<repo>/; a <user>.github.io repo is served at /.
       - name: Build
         run: |

@@ -41,6 +41,21 @@ function toHash(r: Route) {
   return `#/${r.name}`;
 }
 
+/** Opening the app (no address inside it) with an account linked goes straight to its games. */
+function initialRoute(): Route {
+  const r = parseHash();
+  if (r.name !== 'home' || (location.hash !== '' && location.hash !== '#')) return r;
+  const first = loadAccounts()[0];
+  if (!first) return r;
+  const games: Route = { name: 'games', platform: first.platform, username: first.username };
+  try {
+    history.replaceState(history.state, '', toHash(games));
+  } catch {
+    /* ignore */
+  }
+  return games;
+}
+
 function loadCurrentGame(): { game: GameSummary | null; perspective?: string } {
   try {
     const raw = sessionStorage.getItem('dc:current');
@@ -51,7 +66,7 @@ function loadCurrentGame(): { game: GameSummary | null; perspective?: string } {
 }
 
 export default function App() {
-  const [route, setRoute] = useState<Route>(parseHash);
+  const [route, setRoute] = useState<Route>(initialRoute);
   const [accounts, setAccounts] = useState<Account[]>(loadAccounts);
   const [settings, setSettings] = useState<Settings>(loadSettings);
   const [current, setCurrent] = useState(loadCurrentGame);

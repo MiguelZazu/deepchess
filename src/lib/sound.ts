@@ -8,9 +8,14 @@ import type { CustomSoundSlot, SoundPack, SoundSettings } from './types';
 export type SoundEvent = 'move' | 'capture' | 'check' | 'castle' | 'promote';
 type BuiltinPack = Exclude<SoundPack, 'custom'>;
 
-export const DEFAULT_SOUND: SoundSettings = { enabled: true, volume: 0.8, pack: 'board', custom: {} };
+declare const __HAS_FOLEY__: boolean;
+/** The "Foley" recordings are only bundled when the build has them (see vite.config.ts). */
+export const HAS_FOLEY = typeof __HAS_FOLEY__ !== 'undefined' && __HAS_FOLEY__;
 
-export const SOUND_PACKS: { id: BuiltinPack; readonly label: string; readonly hint: string }[] = [
+export const DEFAULT_SOUND: SoundSettings = { enabled: true, volume: 0.8, pack: HAS_FOLEY ? 'foley' : 'board', custom: {} };
+
+const ALL_PACKS: { id: BuiltinPack; readonly label: string; readonly hint: string }[] = [
+  { id: 'foley', get label() { return t('Clásico'); }, get hint() { return t('Grabación de piezas sobre tablero (por defecto)'); } },
   { id: 'board', get label() { return t('Tablero'); }, get hint() { return t('Grabación real de piezas de madera'); } },
   { id: 'wood', get label() { return t('Madera'); }, get hint() { return t('Golpe de madera generado por la app'); } },
   { id: 'soft', get label() { return t('Suave'); }, get hint() { return t('Toques discretos y redondos'); } },
@@ -19,9 +24,11 @@ export const SOUND_PACKS: { id: BuiltinPack; readonly label: string; readonly hi
   { id: 'nes', get label() { return t('8 bits'); }, get hint() { return t('Consola retro'); } },
   { id: 'futuristic', get label() { return t('Futurista'); }, get hint() { return t('Sonidos electrónicos'); } },
 ];
+export const SOUND_PACKS = ALL_PACKS.filter((p) => p.id !== 'foley' || HAS_FOLEY);
 
 /** Authors and licenses of the bundled recordings (shown in Settings → Data → Credits). */
 export const SOUND_CREDITS = [
+  ...(HAS_FOLEY ? [{ name: 'Clásico', author: 'Creazilla (creazilla.com)', get license() { return t('licencia de Creazilla'); }, url: 'https://creazilla.com/' }] : []),
   { name: 'Tablero', author: 'el_boss (freesound.org)', license: 'CC0 1.0', url: 'https://freesound.org/people/el_boss/packs/30764/' },
   { name: 'Efectos, Piano, 8 bits, Futurista', author: 'Enigmahack (lichess.org)', license: 'AGPLv3+', url: 'https://github.com/lichess-org/lila/blob/master/COPYING.md' },
 ];
@@ -146,6 +153,7 @@ const SYNTH: Record<'wood' | 'soft', Record<SoundEvent, Voice[]>> = {
 
 type FileSlot = 'move' | 'capture' | 'check';
 const FILE_PACKS: Record<Exclude<BuiltinPack, 'wood' | 'soft'>, FileSlot[]> = {
+  foley: ['move', 'capture'],
   board: ['move', 'capture'],
   sfx: ['move', 'capture', 'check'],
   piano: ['move', 'capture', 'check'],
@@ -266,7 +274,7 @@ export async function customSoundNames(): Promise<Partial<Record<CustomSoundSlot
 
 // ---------------------------------------------------------------- public API
 
-const KNOWN: SoundPack[] = ['board', 'wood', 'soft', 'sfx', 'piano', 'nes', 'futuristic', 'custom'];
+const KNOWN: SoundPack[] = [...(HAS_FOLEY ? (['foley'] as SoundPack[]) : []), 'board', 'wood', 'soft', 'sfx', 'piano', 'nes', 'futuristic', 'custom'];
 /** Packs from older versions that no longer exist fall back to the default. */
 export const normalizePack = (p: string): SoundPack => (KNOWN.includes(p as SoundPack) ? (p as SoundPack) : DEFAULT_SOUND.pack);
 

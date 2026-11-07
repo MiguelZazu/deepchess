@@ -33,7 +33,7 @@ function writeLS(key: string, value: unknown) {
 
 // ---------- Settings ----------
 /** Bump when defaults change in a way existing users should get too (see loadSettings). */
-const SETTINGS_REV = 4;
+const SETTINGS_REV = 5;
 export const DEFAULT_SETTINGS: Settings = {
   language: detectLang(),
   engine: 'sf19-lite',
@@ -69,6 +69,10 @@ export function loadSettings(): Settings {
   if ((raw.settingsRev ?? 0) < 3 && Object.keys(raw).length > 0) {
     // v3: the single live arrow became N arrows for the top moves.
     out.liveArrows = raw.showLiveArrow === false ? 0 : 3;
+  }
+  if ((raw.settingsRev ?? 0) < 5 && Object.keys(raw).length > 0 && sound.pack === 'board') {
+    // v5: the new default move sound (when this build includes it).
+    sound.pack = DEFAULT_SOUND.pack;
   }
   // At most 3 arrows (more just clutters the board).
   out.liveArrows = Math.max(0, Math.min(MAX_ARROWS, Math.round(Number(out.liveArrows) || 0)));

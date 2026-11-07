@@ -19,3 +19,6 @@ android/keystore.properties
 # Local tooling / build caches
 .claude
 *.tsbuildinfo
+
+# Third-party sounds that can't be redistributed in a public repo (CI gets them from secrets)
+public/sounds/foley/
