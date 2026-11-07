@@ -28,6 +28,8 @@ jobs:
       # The runner image already ships the Android SDK (ANDROID_HOME); Gradle fetches anything missing.
       - run: npm ci
       - run: npm run build && npx cap sync android && node scripts/prune-android.mjs
+        env:
+          VITE_NO_FULL_SINGLE: '1'
       - name: Restore signing key
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

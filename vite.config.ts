@@ -30,6 +30,10 @@ export default defineConfig({
     csp,
     VitePWA({
       registerType: 'autoUpdate',
+      // Own service worker (src/sw.ts): it also adds the cross-origin isolation headers.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'DeepChess — Análisis con Stockfish 19',
@@ -49,17 +53,10 @@ export default defineConfig({
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
         ],
       },
-      workbox: {
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,wasm,json,mp3}'],
-        // The full engine (~95 MB) is cached on first use instead of precached.
+        // The full engine (~95 MB) is cached on first use (see src/sw.ts) instead of precached.
         globIgnores: ['engine/stockfish-19.*', 'engine/stockfish-19-single.*'],
-        runtimeCaching: [
-          {
-            urlPattern: /\/engine\/stockfish-19(-single)?\.(js|wasm)$/,
-            handler: 'CacheFirst',
-            options: { cacheName: 'engine-full', expiration: { maxEntries: 4 } },
-          },
-        ],
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
       },
     }),

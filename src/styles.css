@@ -3455,3 +3455,9 @@ details.more[open] summary svg {
     opacity: 0.4;
   }
 }
+
+.warn-text {
+  margin-top: 4px;
+  color: #e0a94a;
+  font-size: 12px;
+}

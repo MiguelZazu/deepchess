@@ -157,3 +157,5 @@ una subcarpeta compila con `BASE=/carpeta/ npm run build`. En el móvil: "Añadi
 
 Las piezas y los sonidos incluidos mantienen la licencia de sus autores (ver Ajustes → Datos → Créditos y `src/data/pieceSets.json`).
 Stockfish es GPLv3; si distribuyes la app debes publicar el código fuente bajo GPLv3. DeepChess no está afiliado a Chess.com ni a Lichess.
+Varios juegos de piezas son CC BY-NC (uso no comercial): si la app llegara a tener ánimo de lucro (anuncios, versión de pago),
+habría que quitarlos (`npm run pieces -- --commercial`).

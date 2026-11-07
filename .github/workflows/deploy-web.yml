@@ -29,11 +29,13 @@ jobs:
         run: |
           REPO="${{ github.event.repository.name }}"
           if [[ "$REPO" == *.github.io ]]; then export BASE=/; else export BASE="/$REPO/"; fi
+          # The service worker (src/sw.ts) makes the site cross-origin isolated, so the
+          # multi-threaded engines run. The single-threaded full engine (~95 MB) is left out; where
+          # isolation is unavailable (Safari) the app falls back to Lite.
+          export VITE_NO_FULL_SINGLE=1
           npm run build
+          rm -f dist/engine/stockfish-19-single.js dist/engine/stockfish-19-single.wasm
           cp dist/index.html dist/404.html
-          # GitHub Pages can't send the COOP/COEP headers that multi-threaded WASM needs, so the
-          # app always loads the single-threaded engines there: drop the threaded builds (~100 MB).
-          rm -f dist/engine/stockfish-19.js dist/engine/stockfish-19.wasm dist/engine/stockfish-19-lite.js dist/engine/stockfish-19-lite.wasm
           du -sh dist
       - uses: actions/upload-pages-artifact@v3
         with:

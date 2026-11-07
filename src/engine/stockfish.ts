@@ -46,6 +46,14 @@ export const ENGINES: Record<EngineId, { name: string; single: string; multi: st
 
 /** Multi-threaded builds need SharedArrayBuffer (cross-origin isolation). */
 export const canUseThreads = () => typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated;
+
+/**
+ * The web (GitHub Pages) and Android builds leave out the single-threaded full engine (~95 MB):
+ * they run multi-threaded. If isolation is unavailable there (e.g. Safari), the full engine
+ * falls back to Lite.
+ */
+export const hasFullSingle = import.meta.env.VITE_NO_FULL_SINGLE !== '1';
+export const effectiveEngine = (id: EngineId): EngineId => (id === 'sf19' && !canUseThreads() && !hasFullSingle ? 'sf19-lite' : id);
 export const maxThreads = () => (canUseThreads() ? Math.max(1, navigator.hardwareConcurrency || 1) : 1);
 
 export interface EngineConfig {
@@ -66,7 +74,7 @@ export class StockfishEngine {
   private dead = false;
 
   constructor(config: EngineConfig) {
-    const def = ENGINES[config.id];
+    const def = ENGINES[effectiveEngine(config.id)];
     const threaded = canUseThreads();
     this.config = { ...config, threads: threaded ? Math.min(config.threads, maxThreads()) : 1 };
     this.name = def.name;

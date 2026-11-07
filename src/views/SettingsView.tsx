@@ -15,7 +15,7 @@ import {
   pieceUrl,
 } from '../lib/appearance';
 import { customSoundNames, deleteCustomSound, playDemo, playSound, saveCustomSound, SOUND_CREDITS, SOUND_PACKS } from '../lib/sound';
-import { ENGINES, canUseThreads, maxThreads, type EngineId } from '../engine/stockfish';
+import { ENGINES, canUseThreads, effectiveEngine, maxThreads, type EngineId } from '../engine/stockfish';
 import { TIME_OPTIONS } from '../components/EngineLines';
 import { Board } from '../components/Board';
 import { ClassIcon, CLASS_META } from '../components/ClassIcon';
@@ -600,6 +600,7 @@ function EngineTab({
               <b>{ENGINES[id].name}</b>
               <span className="tag">{ENGINES[id].size}</span>
               <p>{ENGINES[id].note}</p>
+              {effectiveEngine(id) !== id && <p className="warn-text">{t('No disponible en este navegador (necesita multihilo): se usará Lite.')}</p>}
             </button>
           ))}
         </div>
@@ -608,7 +609,7 @@ function EngineTab({
           hint={
             threaded
               ? t('Tu equipo tiene {n} núcleos lógicos.', { n: cores })
-              : t('Multihilo no disponible aquí (Android o navegador sin aislamiento): se usa 1 hilo.')
+              : t('Multihilo no disponible en este navegador (p. ej. Safari): se usa 1 hilo.')
           }
         >
           <select value={threaded ? Math.min(settings.threads, cores) : 1} disabled={!threaded} onChange={(e) => set('threads', Number(e.target.value))}>

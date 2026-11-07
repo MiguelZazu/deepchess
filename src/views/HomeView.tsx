@@ -63,7 +63,7 @@ export function HomeView({ accounts, onAddAccount, onRemoveAccount, onOpenAccoun
           {t('Analiza tus partidas como un')}{' '}<span className="grad">{t('profesional')}</span>
         </h1>
         <p className="hero-sub">
-          {t('Vincula tu cuenta de Chess.com o Lichess y obtén precisión, clasificación de cada jugada, gráfico de evaluación y las mejores líneas. Gratis, privado y sin servidores.')}
+          {t('Vincula tu cuenta de Chess.com o Lichess y obtén precisión, clasificación de cada jugada, gráfico de evaluación y las mejores líneas.')}
         </p>
       </header>
 

@@ -46,8 +46,8 @@ export const EN: Record<string, string> = {
   'Stockfish 19 Lite · se ejecuta en tu dispositivo': 'Stockfish 19 Lite · runs on your device',
   'Analiza tus partidas como un': 'Analyze your games like a',
   profesional: 'pro',
-  'Vincula tu cuenta de Chess.com o Lichess y obtén precisión, clasificación de cada jugada, gráfico de evaluación y las mejores líneas. Gratis, privado y sin servidores.':
-    'Link your Chess.com or Lichess account and get accuracy, a classification for every move, an evaluation graph and the best lines. Free, private and serverless.',
+  'Vincula tu cuenta de Chess.com o Lichess y obtén precisión, clasificación de cada jugada, gráfico de evaluación y las mejores líneas.':
+    'Link your Chess.com or Lichess account and get accuracy, a classification for every move, an evaluation graph and the best lines.',
   'Vincular cuenta': 'Link account',
   'Nombre de usuario': 'Username',
   Vincular: 'Link',
@@ -198,7 +198,7 @@ export const EN: Record<string, string> = {
   MB: 'MB',
   'Hilos de CPU': 'CPU threads',
   'Tu equipo tiene {n} núcleos lógicos.': 'Your device has {n} logical cores.',
-  'Multihilo no disponible aquí (Android o navegador sin aislamiento): se usa 1 hilo.': 'Multithreading is not available here (Android or a browser without isolation): 1 thread is used.',
+  'Multihilo no disponible en este navegador (p. ej. Safari): se usa 1 hilo.': 'Multithreading is not available in this browser (e.g. Safari): 1 thread is used.',
   'Memoria hash': 'Hash memory',
   'Más memoria ayuda en análisis largos.': 'More memory helps long analyses.',
   'Revisión de partidas': 'Game review',
@@ -246,6 +246,7 @@ export const EN: Record<string, string> = {
   Oscura: 'Dark',
   Coordenadas: 'Coordinates',
   Sonido: 'Sound',
+  'No disponible en este navegador (necesita multihilo): se usará Lite.': 'Not available in this browser (needs multi-threading): Lite will be used.',
   Modo: 'Mode',
   Estadísticas: 'Statistics',
   'Juegan {side}': '{side} to move',
