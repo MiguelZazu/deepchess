@@ -28,6 +28,8 @@ interface Props {
 }
 
 const PREMOVE_TINT = 'rgba(214, 69, 65, 0.55)';
+/** Square marked with a right click (like Chess.com). */
+const MARK_TINT = 'rgba(235, 97, 80, 0.8)';
 
 export function Board({ fen, orientation, lastMove, badge, arrows = [], onMove, id = 'deepchess-board', highlights, premove }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -40,6 +42,10 @@ export function Board({ fen, orientation, lastMove, badge, arrows = [], onMove, 
   const [queued, setQueued] = useState<{ from: string; to: string } | null>(null);
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
+  // Right-click marks: toggled with a right click, cleared by a left click or a new position,
+  // the same way as the arrows drawn with the right button.
+  const [marks, setMarks] = useState<string[]>([]);
+  useEffect(() => setMarks([]), [fen, id]);
 
   useEffect(() => {
     if (!queued || turn !== me || !onMoveRef.current) return;
@@ -116,6 +122,7 @@ export function Board({ fen, orientation, lastMove, badge, arrows = [], onMove, 
     squareStyles[queued.from] = { boxShadow: `inset 0 0 0 200px ${PREMOVE_TINT}` };
     squareStyles[queued.to] = { boxShadow: `inset 0 0 0 200px ${PREMOVE_TINT}` };
   }
+  for (const sq of marks) squareStyles[sq] = { ...squareStyles[sq], boxShadow: `inset 0 0 0 200px ${MARK_TINT}` };
   if (selected) squareStyles[selected] = { boxShadow: `inset 0 0 0 200px ${premoving ? PREMOVE_TINT : hexA(look.highlight, 0.55)}` };
   for (const t of targets) {
     squareStyles[t] = {
@@ -154,9 +161,17 @@ export function Board({ fen, orientation, lastMove, badge, arrows = [], onMove, 
             }
             return tryMove(sourceSquare, targetSquare);
           },
-          onSquareRightClick: () => {
-            setQueued(null);
-            if (premoving) setSelected(null);
+          onSquareRightClick: ({ square }) => {
+            // A right click first cancels a queued premove; otherwise it marks / unmarks the square.
+            if (queued || (premoving && selected)) {
+              setQueued(null);
+              setSelected(null);
+              return;
+            }
+            setMarks((m) => (m.includes(square) ? m.filter((x) => x !== square) : [...m, square]));
+          },
+          onSquareMouseDown: (_, e) => {
+            if (e.button === 0 && marks.length) setMarks([]);
           },
           onSquareClick: ({ square, piece }) => {
             if (premoving) {
