@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ImagePlus, Languages, Play, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { LANGS, t } from '../i18n';
-import { clearReviews, DEFAULT_SETTINGS } from '../lib/storage';
+import { clearReviews, DEFAULT_SETTINGS, MAX_REVIEWS, reviewCount } from '../lib/storage';
 import { deleteAsset, getAsset, saveAsset } from '../lib/assets';
 import {
   ACCENTS,
@@ -690,21 +690,19 @@ function EngineTab({
         </Row>
         <Row
           label={t('Flechas de jugadas recomendadas')}
-          hint={t('Las mejores jugadas del motor, cada flecha con el color de su clasificación (brillante, mejor, excelente…).')}
+          hint={t('Las mejores jugadas del motor (hasta 3), cada flecha con el color de su clasificación (brillante, mejor, excelente…).')}
         >
-          <select
-            value={settings.liveArrows}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              patch({ liveArrows: n, liveLines: Math.max(settings.liveLines, n) });
-            }}
-          >
-            {[0, 1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>
+          <div className="seg-mini">
+            {[0, 1, 2, 3].map((n) => (
+              <button
+                key={n}
+                className={settings.liveArrows === n ? 'active' : ''}
+                onClick={() => patch({ liveArrows: n, liveLines: Math.max(settings.liveLines, n) })}
+              >
                 {n === 0 ? t('Ninguna') : n}
-              </option>
+              </button>
             ))}
-          </select>
+          </div>
         </Row>
       </section>
     </>
@@ -715,20 +713,40 @@ function EngineTab({
 
 function DataTab({ settings, onChange }: Props) {
   const [cleared, setCleared] = useState(false);
+  const [count, setCount] = useState<number | null>(null);
+  const [usage, setUsage] = useState<number | null>(null);
+  useEffect(() => {
+    void reviewCount().then(setCount);
+    navigator.storage
+      ?.estimate?.()
+      .then((e) => setUsage(e.usage ?? null))
+      .catch(() => undefined);
+  }, [cleared]);
   return (
     <>
       <section className="card">
         <h3 className="card-title">{t('Datos')}</h3>
-        <Row label={t('Borrar análisis guardados')} hint="Las revisiones se guardan en este dispositivo para abrirlas al instante.">
-          <button
-            className="btn ghost"
-            onClick={async () => {
-              await clearReviews();
-              setCleared(true);
-            }}
-          >
-            {cleared ? t('Borrado') : t('Borrar')}
-          </button>
+        <Row
+          label={t('Borrar análisis guardados')}
+          hint={t('Las revisiones se guardan en este dispositivo para abrirlas al instante. Se guardan las {n} más recientes; las antiguas se borran solas (si vuelves a abrir esa partida se analiza de nuevo). La precisión de la lista de partidas se conserva.', { n: MAX_REVIEWS })}
+        >
+          <div className="row-actions">
+            {count != null && (
+              <span className="muted mono storage-info">
+                {t('{n} guardados', { n: count })}
+                {usage != null ? ` · ${(usage / 1048576).toFixed(1)} MB` : ''}
+              </span>
+            )}
+            <button
+              className="btn ghost"
+              onClick={async () => {
+                await clearReviews();
+                setCleared(true);
+              }}
+            >
+              {cleared ? t('Borrado') : t('Borrar')}
+            </button>
+          </div>
         </Row>
         <Row label={t('Restablecer apariencia')}>
           <button className="btn ghost" onClick={() => onChange({ ...settings, appearance: { ...DEFAULT_APPEARANCE, assets: settings.appearance.assets } })}>

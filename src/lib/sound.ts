@@ -308,6 +308,22 @@ export function playSound(ev: SoundEvent, opts: { preview?: boolean; pack?: Soun
   for (const v of synth[ev]) v(c, master, now);
 }
 
+/** Clock warning for timed modes: a soft tick, higher and louder when `urgent`; `end` = time up. */
+export function playClock(kind: 'tick' | 'urgent' | 'end') {
+  if (!cfg.enabled) return;
+  if (typeof document !== 'undefined' && document.hidden) return;
+  const c = audio();
+  if (!c || !master) return;
+  const now = c.currentTime + 0.005;
+  const voices =
+    kind === 'tick'
+      ? [tone('square', 1320, 1320, 0.035, 0.05)]
+      : kind === 'urgent'
+        ? [tone('square', 1760, 1760, 0.05, 0.08), tone('sine', 880, 880, 0.08, 0.06)]
+        : [tone('sawtooth', 440, 330, 0.35, 0.09), tone('sine', 220, 165, 0.45, 0.12)];
+  for (const v of voices) v(c, master, now);
+}
+
 /** Plays a short demo: move, capture and check. */
 export function playDemo(pack?: SoundPack) {
   if (pack) preload(pack);

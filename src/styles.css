@@ -934,14 +934,16 @@ button.chip:hover {
 /* ---------------- Analysis ---------------- */
 .analysis {
   display: grid;
-  grid-template-columns: minmax(0, auto) minmax(340px, 420px);
+  grid-template-columns: max-content minmax(340px, 420px);
   gap: 22px;
-  padding: 18px 22px 28px;
+  padding: 10px 22px;
   justify-content: center;
   align-items: start;
 }
+/* The board fills the window from top to bottom: only the two player bars (~42px each), the
+   gaps and the page padding are left over; the controls live in the side panel. */
 .board-col {
-  width: min(calc(100vh - 150px), calc(100vw - var(--sidebar) - 500px), 820px);
+  width: min(calc(100vh - 76px), calc(100vw - var(--sidebar) - 430px));
   min-width: 320px;
   display: flex;
   flex-direction: column;
@@ -1096,8 +1098,30 @@ button.chip:hover {
   gap: 12px;
   min-width: 0;
   position: sticky;
-  top: 18px;
-  max-height: calc(100vh - 36px);
+  top: 10px;
+  max-height: calc(100vh - 20px);
+}
+.nav-in-col {
+  display: none;
+}
+.nav-in-panel .nav-controls {
+  padding-left: 0;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 6px;
+}
+.start-review {
+  display: flex;
+  justify-content: center;
+  padding: 4px 12px 14px;
+}
+.start-review .btn {
+  width: 100%;
+  justify-content: center;
+}
+.gr-acc.mine {
+  color: var(--accent);
 }
 .panel-title h2 {
   font-size: 17px;
@@ -1836,7 +1860,7 @@ input[type='range'] {
   align-items: start;
 }
 .train-layout .board-col {
-  width: min(calc(100vh - 190px), calc(100vw - var(--sidebar) - 480px), 720px);
+  width: min(calc(100vh - 156px), calc(100vw - var(--sidebar) - 420px));
 }
 .train-layout .panel {
   max-height: none;
@@ -2237,8 +2261,14 @@ input[type='range'] {
     margin: 0 auto;
   }
   .board-col {
-    width: min(100%, calc(100vh - 160px));
+    width: min(100%, calc(100vh - 120px));
     margin: 0 auto;
+  }
+  .nav-in-col {
+    display: block;
+  }
+  .nav-in-panel {
+    display: none;
   }
   .panel {
     position: static;

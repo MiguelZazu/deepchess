@@ -14,8 +14,17 @@ interface Props {
 
 export function MoveList({ moves, reviews, ply, startMoveNumber, onSelect }: Props) {
   const activeRef = useRef<HTMLButtonElement>(null);
+  // Keep the current move in the middle of its scrolling box (without scrolling the page).
   useEffect(() => {
-    activeRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const el = activeRef.current;
+    if (!el) return;
+    let box = el.parentElement;
+    while (box && !(box.scrollHeight > box.clientHeight && /(auto|scroll)/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
+    if (!box) return;
+    const r = el.getBoundingClientRect();
+    const b = box.getBoundingClientRect();
+    const top = box.scrollTop + (r.top - b.top) - (b.height - r.height) / 2;
+    box.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
   }, [ply]);
 
   const startsBlack = moves[0]?.color === 'b';

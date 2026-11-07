@@ -5,6 +5,7 @@ import { gameOutcomeForUser } from '../lib/chess';
 import type { Account, GameSummary, Outcome, Profile, TimeClass } from '../lib/types';
 import { Avatar } from './HomeView';
 import { PlatformLogo } from '../components/PlatformLogo';
+import { loadAnalyzed, type AnalyzedEntry } from '../lib/storage';
 
 import { t } from '../i18n';
 
@@ -33,6 +34,8 @@ export function GamesView({ account, onAnalyze }: Props) {
   const [tc, setTc] = useState<TimeClass | 'all'>('all');
   const [result, setResult] = useState<Outcome | 'all'>('all');
   const [query, setQuery] = useState('');
+  // Accuracy of the games already reviewed in DeepChess (read once per visit of the list).
+  const [analyzed] = useState(loadAnalyzed);
 
   const loadMore = useCallback(
     async (reset = false) => {
@@ -217,7 +220,7 @@ export function GamesView({ account, onAnalyze }: Props) {
           <h3 className="section-title">{month}</h3>
           <div className="game-list">
             {list.map((g) => (
-              <GameRow key={g.id} game={g} username={account.username} onAnalyze={() => onAnalyze(g, account.username)} />
+              <GameRow key={g.id} game={g} username={account.username} analyzed={analyzed[g.id]} onAnalyze={() => onAnalyze(g, account.username)} />
             ))}
           </div>
         </section>
@@ -246,12 +249,31 @@ export function GamesView({ account, onAnalyze }: Props) {
   );
 }
 
-function GameRow({ game, username, onAnalyze }: { game: GameSummary; username: string; onAnalyze: () => void }) {
+function GameRow({
+  game,
+  username,
+  analyzed,
+  onAnalyze,
+}: {
+  game: GameSummary;
+  username: string;
+  analyzed?: AnalyzedEntry;
+  onAnalyze: () => void;
+}) {
   const o = gameOutcomeForUser(game, username);
   const me = o?.color === 'black' ? game.black : game.white;
   const opp = o?.color === 'black' ? game.white : game.black;
   const myColor = o?.color ?? 'white';
-  const acc = game.accuracies ? (myColor === 'white' ? game.accuracies.white : game.accuracies.black) : undefined;
+  // Our own review first; otherwise the accuracy the platform reports (Chess.com reviewed games).
+  const acc = analyzed
+    ? myColor === 'white'
+      ? analyzed.w
+      : analyzed.b
+    : game.accuracies
+      ? myColor === 'white'
+        ? game.accuracies.white
+        : game.accuracies.black
+      : undefined;
   const d = new Date(game.endTime);
   return (
     <button className={`game-row ${o?.outcome ?? 'draw'}`} onClick={onAnalyze}>
@@ -271,7 +293,11 @@ function GameRow({ game, username, onAnalyze }: { game: GameSummary; username: s
       </div>
       <div className="gr-right">
         {me.rating && <span className="gr-rating mono">{me.rating}</span>}
-        {acc != null && <span className="gr-acc mono">{acc.toFixed(1)}%</span>}
+        {acc != null && (
+          <span className={`gr-acc mono ${analyzed ? 'mine' : ''}`} title={analyzed ? t('Tu precisión (analizada en DeepChess)') : t('Tu precisión')}>
+            {acc.toFixed(1)}%
+          </span>
+        )}
         <span className="btn small primary gr-cta">
           <Sparkles size={14} />{' '}{t('Analizar')}
         </span>

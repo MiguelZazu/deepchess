@@ -403,6 +403,17 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
     [variation, mainMoves.length],
   );
 
+  // While a review runs, and as soon as the reviewed game is stepped through, the move list
+  // (with the current move highlighted) takes the summary's place.
+  const lastPly = useRef(ply);
+  useEffect(() => {
+    if (ply !== lastPly.current && ply > 0 && !variation) setTab('moves');
+    lastPly.current = ply;
+  }, [ply, variation]);
+  useEffect(() => {
+    if (reviewing) setTab('moves');
+  }, [reviewing]);
+
   const selectPly = (p: number) => {
     setVariation(null);
     setPly(p);
@@ -551,6 +562,71 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
       </select>
       <button className="btn primary" onClick={() => startReview(depth)}>
         <Sparkles size={16} /> {review ? t('Re-analizar') : t('Revisar partida')}
+      </button>
+    </div>
+  );
+
+  const navEl = (
+    <div className="nav-controls">
+      <button className="icon-btn" onClick={() => go('first')} aria-label={t('Inicio')}>
+        <ChevronFirst size={20} />
+      </button>
+      <button className="icon-btn big" onClick={() => go('prev')} aria-label={t('Anterior')}>
+        <ChevronLeft size={24} />
+      </button>
+      <button className="icon-btn big" onClick={() => go('next')} aria-label={t('Siguiente')}>
+        <ChevronRight size={24} />
+      </button>
+      <button className="icon-btn" onClick={() => go('last')} aria-label={t('Final')}>
+        <ChevronLast size={20} />
+      </button>
+      <span className="nav-sep" />
+      <button
+        className="icon-btn"
+        onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}
+        aria-label={t('Girar tablero')}
+        title={t('Girar tablero (F)')}
+      >
+        <FlipVertical2 size={18} />
+      </button>
+      <button
+        className="icon-btn"
+        onClick={() => navigator.clipboard?.writeText(currentFen)}
+        aria-label={t('Copiar FEN')}
+        title={t('Copiar FEN')}
+      >
+        <Copy size={18} />
+      </button>
+      {isFree && freeMoves.length > 0 && (
+        <button
+          className="icon-btn"
+          onClick={() => {
+            setFreeMoves([]);
+            setPly(0);
+            setReview(null);
+          }}
+          aria-label={t('Reiniciar tablero')}
+          title={t('Reiniciar tablero')}
+        >
+          <RotateCcw size={18} />
+        </button>
+      )}
+    </div>
+  );
+
+  const bannerEl = variation && (
+    <div className="variation-banner">
+      <span>
+        {t('Explorando variante ·')}{' '}{variation.moves.slice(0, variation.idx).map((m) => m.san).join(' ') || '—'}
+      </span>
+      <button
+        className="btn small"
+        onClick={() => {
+          setPly(variation.base);
+          setVariation(null);
+        }}
+      >
+        <Undo2 size={14} />{' '}{t('Volver a la partida')}
       </button>
     </div>
   );
@@ -789,67 +865,7 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
           />
         </div>
         {playerBar(bottomColor)}
-        <div className="nav-controls">
-          <button className="icon-btn" onClick={() => go('first')} aria-label={t('Inicio')}>
-            <ChevronFirst size={20} />
-          </button>
-          <button className="icon-btn big" onClick={() => go('prev')} aria-label={t('Anterior')}>
-            <ChevronLeft size={24} />
-          </button>
-          <button className="icon-btn big" onClick={() => go('next')} aria-label={t('Siguiente')}>
-            <ChevronRight size={24} />
-          </button>
-          <button className="icon-btn" onClick={() => go('last')} aria-label={t('Final')}>
-            <ChevronLast size={20} />
-          </button>
-          <span className="nav-sep" />
-          <button
-            className="icon-btn"
-            onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}
-            aria-label={t('Girar tablero')}
-            title={t('Girar tablero (F)')}
-          >
-            <FlipVertical2 size={18} />
-          </button>
-          <button
-            className="icon-btn"
-            onClick={() => navigator.clipboard?.writeText(currentFen)}
-            aria-label={t('Copiar FEN')}
-            title={t('Copiar FEN')}
-          >
-            <Copy size={18} />
-          </button>
-          {isFree && freeMoves.length > 0 && (
-            <button
-              className="icon-btn"
-              onClick={() => {
-                setFreeMoves([]);
-                setPly(0);
-                setReview(null);
-              }}
-              aria-label={t('Reiniciar tablero')}
-              title={t('Reiniciar tablero')}
-            >
-              <RotateCcw size={18} />
-            </button>
-          )}
-        </div>
-        {variation && (
-          <div className="variation-banner">
-            <span>
-              {t('Explorando variante ·')}{' '}{variation.moves.slice(0, variation.idx).map((m) => m.san).join(' ') || '—'}
-            </span>
-            <button
-              className="btn small"
-              onClick={() => {
-                setPly(variation.base);
-                setVariation(null);
-              }}
-            >
-              <Undo2 size={14} />{' '}{t('Volver a la partida')}
-            </button>
-          </div>
-        )}
+        <div className="nav-in-col">{navEl}</div>
       </section>
 
       <aside className="panel">
@@ -871,6 +887,8 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
             </div>
           </div>
         </div>
+
+        {bannerEl}
 
         <EngineLines
           fen={currentFen}
@@ -910,7 +928,14 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
         <div className="tab-body">
           {tab === 'review' ? (
             review ? (
-              <ReviewSummary review={review} white={white} black={black} onJump={jumpTo} />
+              <>
+                <ReviewSummary review={review} white={white} black={black} onJump={jumpTo} />
+                <div className="start-review">
+                  <button className="btn primary" onClick={() => selectPly(Math.max(1, ply))}>
+                    <Play size={16} /> {t('Empezar revisión')}
+                  </button>
+                </div>
+              </>
             ) : (
               <div className="empty-hint">
                 {reviewing
@@ -930,6 +955,7 @@ export function AnalysisView({ game, perspective, settings, onSettings }: Props)
             />
           )}
         </div>
+        <div className="nav-in-panel">{navEl}</div>
       </aside>
     </div>
   );

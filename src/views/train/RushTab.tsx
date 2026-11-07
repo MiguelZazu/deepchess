@@ -4,6 +4,7 @@ import { Board } from '../../components/Board';
 import { loadPuzzles, loadRush, pickPuzzle, RUSH_MODES, rushTarget, saveRushRun, type Puzzle, type RushMode } from '../../lib/puzzles';
 import { usePuzzleGame } from '../../lib/usePuzzleGame';
 import { FitBoard, MScreen, useIsMobile } from '../../components/mobile';
+import { playClock } from '../../lib/sound';
 
 import { t } from '../../i18n';
 
@@ -63,13 +64,22 @@ export function RushTab() {
     setPhase('over');
   };
 
-  // Clock
+  // Clock (with a tick every second during the last 10 s, faster/higher in the last 5 s)
   useEffect(() => {
     if (phase !== 'running' || !endAt) return;
+    let lastSec = Infinity;
     const t = setInterval(() => {
-      setNow(Date.now());
-      if (Date.now() >= endAt) finish(resultsRef.current);
-    }, 200);
+      const n = Date.now();
+      setNow(n);
+      if (n >= endAt) {
+        playClock('end');
+        finish(resultsRef.current);
+        return;
+      }
+      const sec = Math.ceil((endAt - n) / 1000);
+      if (sec !== lastSec && sec <= 10) playClock(sec <= 5 ? 'urgent' : 'tick');
+      lastSec = sec;
+    }, 100);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, endAt]);

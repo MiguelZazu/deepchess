@@ -1,4 +1,4 @@
-import { get, set, clear, createStore } from 'idb-keyval';
+import { get, set, clear, createStore, keys, delMany } from 'idb-keyval';
 import type { Account, GameReview, GameSummary, Settings } from './types';
 import { REVIEW_VERSION } from '../analysis/review';
 import { DEFAULT_APPEARANCE } from './appearance';
@@ -33,7 +33,7 @@ function writeLS(key: string, value: unknown) {
 
 // ---------- Settings ----------
 /** Bump when defaults change in a way existing users should get too (see loadSettings). */
-const SETTINGS_REV = 3;
+const SETTINGS_REV = 4;
 export const DEFAULT_SETTINGS: Settings = {
   language: detectLang(),
   engine: 'sf19-lite',
@@ -70,9 +70,12 @@ export function loadSettings(): Settings {
     // v3: the single live arrow became N arrows for the top moves.
     out.liveArrows = raw.showLiveArrow === false ? 0 : 3;
   }
+  // At most 3 arrows (more just clutters the board).
+  out.liveArrows = Math.max(0, Math.min(MAX_ARROWS, Math.round(Number(out.liveArrows) || 0)));
   out.settingsRev = SETTINGS_REV;
   return out;
 }
+export const MAX_ARROWS = 3;
 export const saveSettings = (s: Settings) => writeLS('dc:settings', s);
 
 // ---------- Accounts ----------
@@ -92,27 +95,81 @@ export function pushRecent(item: RecentItem) {
   writeLS('dc:recent', list.slice(0, 24));
 }
 
+// ---------- Analysed games (accuracy index) ----------
+/** Small index of every game reviewed on this device: its accuracy (shown in the game lists) and
+ *  when it was last opened (used to drop the oldest full reviews). A few dozen bytes per game. */
+export interface AnalyzedEntry {
+  w: number;
+  b: number;
+  at: number;
+}
+const MAX_ANALYZED = 3000;
+export function loadAnalyzed(): Record<string, AnalyzedEntry> {
+  try {
+    const raw = localStorage.getItem('dc:analyzed');
+    const obj = raw ? (JSON.parse(raw) as unknown) : null;
+    return obj && typeof obj === 'object' && !Array.isArray(obj) ? (obj as Record<string, AnalyzedEntry>) : {};
+  } catch {
+    return {};
+  }
+}
+function markAnalyzed(gameId: string, acc: { w: number; b: number }) {
+  const all = loadAnalyzed();
+  all[gameId] = { w: Math.round(acc.w * 10) / 10, b: Math.round(acc.b * 10) / 10, at: Date.now() };
+  const ids = Object.keys(all);
+  if (ids.length > MAX_ANALYZED) {
+    ids.sort((a, b) => all[a].at - all[b].at);
+    for (const id of ids.slice(0, ids.length - MAX_ANALYZED)) delete all[id];
+  }
+  writeLS('dc:analyzed', all);
+}
+
 // ---------- Reviews (IndexedDB) ----------
 /** Reviews are cached per game, depth and engine (e.g. "cc-123:14:sf19"). */
 const reviewKey = (gameId: string, depth: number, engine: string) =>
   engine === 'sf19-lite' ? `${gameId}:${depth}` : `${gameId}:${depth}:${engine}`;
+const gameIdOfKey = (key: string) => key.replace(/:\d+(?::[\w.-]+)?$/, '');
+/** Full reviews kept on the device (about 1 KB per move, so 50–100 KB per game); older ones are removed automatically
+ *  and are simply recomputed if that game is opened again. The accuracy index above stays. */
+export const MAX_REVIEWS = 150;
 
 export async function getReview(gameId: string, depth: number, engine: string): Promise<GameReview | undefined> {
   try {
     const r = await get<GameReview>(reviewKey(gameId, depth, engine), reviewStore);
-    return r && r.version === REVIEW_VERSION ? r : undefined;
+    if (!r || r.version !== REVIEW_VERSION) return undefined;
+    markAnalyzed(gameId, r.accuracy);
+    return r;
   } catch {
     return undefined;
   }
 }
 export async function putReview(r: GameReview, engine: string) {
+  markAnalyzed(r.gameId, r.accuracy);
   try {
     await set(reviewKey(r.gameId, r.depth, engine), r, reviewStore);
+    await pruneReviews();
   } catch {
     /* ignore quota errors */
+  }
+}
+/** Drops the least recently opened reviews beyond MAX_REVIEWS. */
+async function pruneReviews() {
+  const all = (await keys(reviewStore)).map(String);
+  if (all.length <= MAX_REVIEWS) return;
+  const seen = loadAnalyzed();
+  const at = (k: string) => seen[gameIdOfKey(k)]?.at ?? 0;
+  all.sort((a, b) => at(a) - at(b));
+  await delMany(all.slice(0, all.length - MAX_REVIEWS), reviewStore);
+}
+export async function reviewCount(): Promise<number> {
+  try {
+    return (await keys(reviewStore)).length;
+  } catch {
+    return 0;
   }
 }
 export async function clearReviews() {
   await clear(reviewStore);
   writeLS('dc:recent', []);
+  writeLS('dc:analyzed', {});
 }

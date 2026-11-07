@@ -87,7 +87,7 @@ export function EngineLines(p: Props) {
         </label>
         <div className="seg-mini" role="group" aria-label={t('Flechas')}>
           <span className="opt-label">{t('Flechas')}</span>
-          {[0, 1, 2, 3, 4, 5].map((n) => (
+          {[0, 1, 2, 3].map((n) => (
             <button
               key={n}
               className={settings.liveArrows === n ? 'active' : ''}
